@@ -138,13 +138,22 @@ Photoionisation cross sections
 ``atoms/N_I_photoionisation.dat`` and ``atoms/O_I_photoionisation.dat``
 give, for every level of ``N_I.dat`` and ``O_I.dat``, the photoionisation
 cross section read by the continuum class ``boundFreePhysical``
-(:doc:`/theory/continuum`): Johnston's (2006) fits of the TOPbase cross
-sections, step models for his levels 1-3 and
+(:doc:`/theory/continuum`). Since 2026-11-16 they hold the total
+photoionisation cross sections of the R-matrix calculations of Nahar and
+Pradhan (1997, N I) and Nahar (1998, O I), as distributed by
+NORAD-Atomic-Data, averaged over photon-energy bins (0.02 eV up to 2 eV
+above threshold, 0.1 eV up to 12 eV, then logarithmic): each J-resolved
+ASD level takes the LS state of the same parent term, outer orbital and
+term, with its table moved so that every channel opens at the ASD binding
+energy (N 226 of 366 levels, O 154 of 580; the others, jK-coupled 4f
+labels, n > 10 and other parents, are ``hydrogenic``). The former default,
+Johnston's (2006) fits of the TOPbase cross sections (step models for his
+levels 1-3 and
 :math:`\sigma = \sigma_{\mathrm{th}}(h\nu_{\mathrm{th}}/h\nu)^\theta` for the
-others. Johnston gives one cross section per grouped level of his level
-model; each J-resolved ASD level takes the cross section of its group.
-Levels outside his model (N 128 of 366, O 427 of 580) are marked
-``hydrogenic`` (Kramers form of the class).
+others), is kept as ``atoms/*_photoionisation_Johnston2006.dat``; its O
+table (B-4) is misaligned as printed (row k+3 holds level k), which made
+the O excited-level cross sections wrong by orders of magnitude (O 3p zero
+in the visible, O 3s and 4s 10-130 times too large).
 
 Diatomic molecules
 ~~~~~~~~~~~~~~~~~~
@@ -256,9 +265,15 @@ Data provenance
        four atomic files
    * - Johnston2006
      - Johnston (2006), PhD thesis, App. A and B
-     - Stark widths of N I and O I (Tables A-1 to A-4); photoionisation
-       cross sections (Tables B-1 to B-4) and the grouped-level model
+     - Stark widths of N I and O I (Tables A-1 to A-4); the former
+       photoionisation cross sections (Tables B-1 to B-4, files
+       ``*_photoionisation_Johnston2006.dat``) and the grouped-level model
        (Tables 3.1, 3.2)
+   * - NaharPradhan1997, Nahar1998, NORAD
+     - Nahar and Pradhan (1997) ApJS 111, 339; Nahar (1998) PRA 58, 3766;
+       NORAD-Atomic-Data (Nahar 2020, Atoms 8, 68), CC BY-NC 4.0
+     - photoionisation cross sections of N I and O I (default since
+       2026-11-16)
    * - IPAC-LaherEspy-1999
      - Laher and Espy, IPAC band tables (index page revised 1999)
      - state constants, :math:`\tilde\nu`, :math:`q`, :math:`A_{v'v''}`

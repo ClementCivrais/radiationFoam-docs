@@ -692,13 +692,22 @@ with a transition probability are included; forbidden lines (e.g. O I
 <p><code class="docutils literal notranslate"><span class="pre">atoms/N_I_photoionisation.dat</span></code> and <code class="docutils literal notranslate"><span class="pre">atoms/O_I_photoionisation.dat</span></code>
 give, for every level of <code class="docutils literal notranslate"><span class="pre">N_I.dat</span></code> and <code class="docutils literal notranslate"><span class="pre">O_I.dat</span></code>, the photoionisation
 cross section read by the continuum class <code class="docutils literal notranslate"><span class="pre">boundFreePhysical</span></code>
-(<a class="reference internal" href="continuum.html"><span class="doc">Continuum radiation</span></a>): Johnston’s (2006) fits of the TOPbase cross
-sections, step models for his levels 1-3 and
+(<a class="reference internal" href="continuum.html"><span class="doc">Continuum radiation</span></a>). Since 2026-11-16 they hold the total
+photoionisation cross sections of the R-matrix calculations of Nahar and
+Pradhan (1997, N I) and Nahar (1998, O I), as distributed by
+NORAD-Atomic-Data, averaged over photon-energy bins (0.02 eV up to 2 eV
+above threshold, 0.1 eV up to 12 eV, then logarithmic): each J-resolved
+ASD level takes the LS state of the same parent term, outer orbital and
+term, with its table moved so that every channel opens at the ASD binding
+energy (N 226 of 366 levels, O 154 of 580; the others, jK-coupled 4f
+labels, n &gt; 10 and other parents, are <code class="docutils literal notranslate"><span class="pre">hydrogenic</span></code>). The former default,
+Johnston’s (2006) fits of the TOPbase cross sections (step models for his
+levels 1-3 and
 <span class="math notranslate nohighlight">\(\sigma = \sigma_{\mathrm{th}}(h\nu_{\mathrm{th}}/h\nu)^\theta\)</span> for the
-others. Johnston gives one cross section per grouped level of his level
-model; each J-resolved ASD level takes the cross section of its group.
-Levels outside his model (N 128 of 366, O 427 of 580) are marked
-<code class="docutils literal notranslate"><span class="pre">hydrogenic</span></code> (Kramers form of the class).</p>
+others), is kept as <code class="docutils literal notranslate"><span class="pre">atoms/*_photoionisation_Johnston2006.dat</span></code>; its O
+table (B-4) is misaligned as printed (row k+3 holds level k), which made
+the O excited-level cross sections wrong by orders of magnitude (O 3p zero
+in the visible, O 3s and 4s 10-130 times too large).</p>
 </section>
 <section id="diatomic-molecules">
 <h3>Diatomic molecules<a class="headerlink" href="#diatomic-molecules" title="Link to this heading"></a></h3>
@@ -836,47 +845,54 @@ four atomic files</p></td>
 </tr>
 <tr class="row-odd"><td><p>Johnston2006</p></td>
 <td><p>Johnston (2006), PhD thesis, App. A and B</p></td>
-<td><p>Stark widths of N I and O I (Tables A-1 to A-4); photoionisation
-cross sections (Tables B-1 to B-4) and the grouped-level model
+<td><p>Stark widths of N I and O I (Tables A-1 to A-4); the former
+photoionisation cross sections (Tables B-1 to B-4, files
+<code class="docutils literal notranslate"><span class="pre">*_photoionisation_Johnston2006.dat</span></code>) and the grouped-level model
 (Tables 3.1, 3.2)</p></td>
 </tr>
-<tr class="row-even"><td><p>IPAC-LaherEspy-1999</p></td>
+<tr class="row-even"><td><p>NaharPradhan1997, Nahar1998, NORAD</p></td>
+<td><p>Nahar and Pradhan (1997) ApJS 111, 339; Nahar (1998) PRA 58, 3766;
+NORAD-Atomic-Data (Nahar 2020, Atoms 8, 68), CC BY-NC 4.0</p></td>
+<td><p>photoionisation cross sections of N I and O I (default since
+2026-11-16)</p></td>
+</tr>
+<tr class="row-odd"><td><p>IPAC-LaherEspy-1999</p></td>
 <td><p>Laher and Espy, IPAC band tables (index page revised 1999)</p></td>
 <td><p>state constants, <span class="math notranslate nohighlight">\(\tilde\nu\)</span>, <span class="math notranslate nohighlight">\(q\)</span>, <span class="math notranslate nohighlight">\(A_{v'v''}\)</span>
 of N<sub>2</sub> 1P/2P, N<sub>2</sub><sup>+</sup> 1N/Meinel,
 NO <span class="math notranslate nohighlight">\(\gamma, \beta, \delta\)</span>, O<sub>2</sub> Schumann-Runge</p></td>
 </tr>
-<tr class="row-odd"><td><p>Gilmore1992</p></td>
+<tr class="row-even"><td><p>Gilmore1992</p></td>
 <td><p>Gilmore, Laher and Espy (1992), JPCRD 21, 1005</p></td>
 <td><p>the <span class="math notranslate nohighlight">\(A \to R_e^2\)</span> constant (Eq. 9) and cross-checks of the
 IPAC tables</p></td>
 </tr>
-<tr class="row-even"><td><p>LaherGilmore1991</p></td>
+<tr class="row-odd"><td><p>LaherGilmore1991</p></td>
 <td><p>Laher and Gilmore (1991), JPCRD 20, 685</p></td>
 <td><p>definition of the IPAC term values (zero of <span class="math notranslate nohighlight">\(T_e\)</span>)</p></td>
 </tr>
-<tr class="row-odd"><td><p>HuberHerzberg1979</p></td>
+<tr class="row-even"><td><p>HuberHerzberg1979</p></td>
 <td><p>Huber and Herzberg (1979)</p></td>
 <td><p><span class="math notranslate nohighlight">\(\mu\)</span>, <span class="math notranslate nohighlight">\(D_e\)</span>, <span class="math notranslate nohighlight">\(\beta_e\)</span>, <span class="math notranslate nohighlight">\(A\)</span> per state;
 <span class="math notranslate nohighlight">\(D_0\)</span> of N<sub>2</sub> C</p></td>
 </tr>
-<tr class="row-even"><td><p>IAEA-LiveChart</p></td>
+<tr class="row-odd"><td><p>IAEA-LiveChart</p></td>
 <td><p>IAEA Live Chart of Nuclides</p></td>
 <td><p>nuclear spins of <sup>14</sup>N and <sup>16</sup>O</p></td>
 </tr>
-<tr class="row-odd"><td><p>PARADE-N2ihl</p></td>
+<tr class="row-even"><td><p>PARADE-N2ihl</p></td>
 <td><p>PARADE molecule data file N2ihl.dat, rev. 2.2.4.2</p></td>
 <td><p>N<sub>2</sub> VUV systems (rows and upper-state constants)</p></td>
 </tr>
-<tr class="row-even"><td><p>SpelsbergMeyer2001, LofthusKrupenie1977, LeRoy-RKR1-LEVEL</p></td>
+<tr class="row-odd"><td><p>SpelsbergMeyer2001, LofthusKrupenie1977, LeRoy-RKR1-LEVEL</p></td>
 <td><p>as named in the PARADE file</p></td>
 <td><p>behind the N<sub>2</sub> VUV constants and rows</p></td>
 </tr>
-<tr class="row-odd"><td><p>Laux1993</p></td>
+<tr class="row-even"><td><p>Laux1993</p></td>
 <td><p>Laux (1993), PhD thesis, Tables H.7-H.9 and G.2</p></td>
 <td><p>NO <span class="math notranslate nohighlight">\(\epsilon, \beta', \gamma'\)</span> rows and constants</p></td>
 </tr>
-<tr class="row-even"><td><p>RadDB-format, PARADE-format</p></td>
+<tr class="row-odd"><td><p>RadDB-format, PARADE-format</p></td>
 <td><p>format definitions</p></td>
 <td><p>file layouts only; no data value</p></td>
 </tr>

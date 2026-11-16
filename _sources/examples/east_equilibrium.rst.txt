@@ -270,9 +270,17 @@ window agrees up to about 10.7 km/s and is 26-36 % high above. The Deep VUV
 is 40 % low: its saturated resonance lines radiate from their wings, which
 are cut at 100 times the larger of the Lorentz and Doppler widths, and many
 lines have no Stark width. The UV/Vis window is 1.2-2 times low: half of its
-radiance at 50-29 is the continuum, and the remaining continuum deficit
-(Gaunt factors set to 1, no electron-neutral bremsstrahlung, no negative
-ions) is the open item of that report.
+radiance at 50-29 is the continuum, and the remaining continuum deficit is
+the open item of that report.
+
+Since 2026-11-16 the photoionisation cross sections of N I and O I are the
+R-matrix values of Nahar and Pradhan (1997) and Nahar (1998) (the O table of
+the former data was misaligned as printed): UV/Vis 0.52, 0.57, 0.60, 0.59,
+0.71, 0.88 (geometric mean 0.63), Vis/NIR 1.06, IR 0.96, VUV 1.12, Deep VUV
+0.62 (geometric means). The attribution of the remaining UV/Vis deficit to
+every published candidate (lines without an ASD transition probability, O\
+:sup:`-` photodetachment, dissolved levels, electron-neutral free-free) and
+to the EAST side is in ``docs/reports/CONTINUUM_UV_20261116.md``.
 
 .. figure:: /_static/figures/examples/east_equilibrium_eq_spectrum_50-29_Blue_pass2.png
    :width: 55%

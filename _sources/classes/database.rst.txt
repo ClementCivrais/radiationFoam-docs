@@ -20,7 +20,9 @@ Layout
        N_I.dat  O_I.dat        neutral N and O: levels, E1 lines, Stark widths
        N_II.dat O_II.dat       N+ and O+: levels, E1 lines
        N_I_photoionisation.dat photoionisation cross section per level of N_I.dat
-       O_I_photoionisation.dat the same for O_I.dat
+                               (Nahar and Pradhan 1997, NORAD)
+       O_I_photoionisation.dat the same for O_I.dat (Nahar 1998, NORAD)
+       *_photoionisation_Johnston2006.dat  former default (Johnston 2006 App. B)
      molecules/
        N2.dat                  X, A, B, C, a, b, b', c3, c'4, o3; 1P, 2P, 6 VUV systems
        N2plus.dat              X, A, B; first negative, Meinel
@@ -29,7 +31,7 @@ Layout
        O2.dat                  X, B; Schumann-Runge
      sources/
        build_atomic_nist.py    fetch / johnston / build  -> atoms/<sp>.dat
-       build_photoionisation.py build                     -> atoms/*_photoionisation.dat
+       build_photoionisation.py fetch / build / check     -> atoms/*_photoionisation*.dat
        build_molecular.py      fetch / build / compare    -> molecules/*.dat
        johnston2006_stark.csv            Johnston (2006) Tables A-1 to A-4
        johnston2006_photoionisation.csv  Johnston (2006) Tables B-1 to B-4
@@ -104,10 +106,12 @@ tabulated``; :doc:`continuum`):
    index hydrogenic
    index steps  nSteps  hnuA_1 hnuB_1 sigma_1 ...     [eV eV Mb]
    index power  hnu_th sigma_th theta                 [eV Mb -]
+   index bins   nBins  hnu_0 ... hnu_nBins  sigma_1 ... sigma_nBins  [eV Mb]
 
 one row per level of the transition file (same index), 1 Mb =
-10\ :sup:`-22` m\ :sup:`2`; each row has a comment naming the Johnston
-group and table.
+10\ :sup:`-22` m\ :sup:`2`; each row has a comment naming its source
+(the NORAD LS state and the ASD and NORAD binding energies, or the
+Johnston group and table).
 
 Molecular format
 ----------------
@@ -173,14 +177,21 @@ the full description.
 
 .. code-block:: bash
 
-   python3 build_photoionisation.py build   # -> ../atoms/N_I_photoionisation.dat, O_I_...
+   python3 build_photoionisation.py fetch   # NORAD files -> raw/norad/ (MANIFEST.json)
+   python3 build_photoionisation.py build   # -> ../atoms/N_I_photoionisation.dat, O_I_..., *_Johnston2006.dat
+   python3 build_photoionisation.py check   # bin areas against the NORAD tables
 
-Reads the Johnston level-model and cross-section transcriptions and the
-ASD level files, assigns every J-resolved ASD level to a Johnston group
-(same configuration and term; same outermost orbital, term and ion-core
-parent; or the hydrogenic n-groups) and writes the cross section of its
-group, or ``hydrogenic`` outside the model. The assignment table is in each
-file header.
+Default files: reads the NORAD photoionisation and energy files of N I and
+O I (Nahar and Pradhan 1997; Nahar 1998) and the ASD level files, assigns
+every J-resolved ASD level to the LS state of the same parent term, outer
+orbital and term (equivalent-electron levels by term), moves the table so
+that every channel opens at the ASD binding energy and writes it as bins
+(0.02 eV to 2 eV above threshold, 0.1 eV to 12 eV, 30 logarithmic bins
+to the end), or ``hydrogenic`` without a state. Former files
+(``*_Johnston2006.dat``): reads the Johnston level-model and cross-section
+transcriptions and assigns every ASD level to a Johnston group (same
+configuration and term; same outermost orbital, term and ion-core parent;
+or the hydrogenic n-groups). The assignment table is in each file header.
 
 ``build_molecular.py``
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -141,6 +141,16 @@ Continuum
        over 10 cases. Open at the time: Johnston nitrogen slab 62.7 against
        80 W cm\ :sup:`-2` (-22 %, below 2 eV); settled as no defect in
        ``3153f7a``.
+   * - 2026-11-16
+     - Photoionisation cross sections of N I and O I from the R-matrix
+       calculations of Nahar and Pradhan (1997) and Nahar (1998) (NORAD),
+       form ``bins`` of ``boundFreePhysical``: radiationFoam against the
+       Python transcription ``verification/continuumUV/continuum_oracle.py``
+       within 7.2e-15 for both cross-section sets; bin areas against the
+       NORAD tables 2.3e-5; the former Johnston (2006) files reproduce the
+       former outputs bit for bit (verification suite 373/373, EAST decks).
+       Johnston (2006) Table B-4 (O) found misaligned as printed (report
+       ``docs/reports/CONTINUUM_UV_20261116.md``).
 
 Transport, line placement and populations from DSMC
 ---------------------------------------------------
@@ -266,6 +276,11 @@ ratios are present/EAST band radiances of the equilibrium cases
    * - ``3153f7a``
      - Deep VUV 0.618 → 0.613, VUV 1.154 → 1.124, UV/Vis 0.596, Vis/NIR
        1.056 → 1.049, IR 0.952 → 0.951.
+   * - 2026-11-16
+     - R-matrix photoionisation cross sections: Deep VUV 0.616 → 0.616,
+       VUV 1.124 → 1.117, UV/Vis 0.596 → 0.634, Vis/NIR 1.049 → 1.058,
+       IR 0.951 → 0.965 (attribution of the remaining UV/Vis deficit in
+       ``docs/reports/CONTINUUM_UV_20261116.md``).
 
 References
 ----------
