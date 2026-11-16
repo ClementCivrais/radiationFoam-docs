@@ -116,7 +116,7 @@ read-only for radiationFoam). It is loaded at run time:
        dsmcRadiationDistributionProperties
        {
            fieldName   radDist;
-           zone        wholeMesh;                  // optional
+           // zone     myCellZone;   // optional: name of a cellZone (default: all cells)
            species
            {
                N  { levelMap "<case>/constant/N.levelMap"; }
