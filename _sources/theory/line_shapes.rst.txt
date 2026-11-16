@@ -1,0 +1,512 @@
+Line shapes and broadening
+==========================
+
+A bound-bound transition does not emit at one wavelength only. The
+emitters move (Doppler effect), the upper and lower levels have a finite
+lifetime (natural broadening), and the collisions with the neighbouring
+particles perturb the phase of the emitted wave train (pressure
+broadening: van der Waals, resonance, phase interruption and Stark
+broadening by the free electrons). The line therefore spreads over a
+small wavelength interval, described by a normalised **line profile**
+:math:`\phi(\lambda)` [m\ :sup:`-1`],
+
+.. math::
+
+   \int_0^\infty \phi(\lambda)\,\mathrm{d}\lambda = 1 .
+
+The bound-bound classes (:doc:`/theory/atomic_lines`,
+:doc:`/theory/diatomic_bands`) compute the integrated emission
+:math:`\varepsilon` [W m\ :sup:`-3` sr\ :sup:`-1`] and the integrated
+absorption :math:`k` [m\ :sup:`-1` m] of every line; the spectral
+coefficients on the wavelength grid are then
+
+.. math::
+
+   j_\lambda(\lambda_i) \mathrel{+}= \varepsilon\,\phi_i,
+   \qquad
+   \kappa_\lambda(\lambda_i) \mathrel{+}= k\,\phi_i ,
+
+where :math:`\phi_i` is the profile value given to grid point
+:math:`i`. This page explains how the code builds :math:`\phi_i`: the
+widths of each broadening mechanism, how they combine into a Voigt
+profile, the approximation of the Voigt shape, its truncation, and its
+placement on the grid.
+
+Sources: ``src/radiation/lineShapes`` (``lineShapeModel``,
+``voigtWhitingOliveroLongbothum``), the width computations in
+``src/radiation/radiators/derived/atomicLines/atomicLines.C`` and
+``src/radiation/radiators/derived/diatomicBands/diatomicBands.C``.
+The classes are documented in :doc:`/classes/line_shapes`.
+
+All widths below are **full widths at half maximum** (FWHM) in metres
+of wavelength. A width :math:`\Delta\nu` in frequency converts to
+wavelength by :math:`\Delta\lambda = \lambda_0^2\,\Delta\nu/c`; the code
+writes the factor :math:`\lambda_0^2/c` once per line (``cWav``).
+
+Gaussian and Lorentzian profiles
+--------------------------------
+
+Two shapes are the building blocks.
+
+* A **Gaussian** of FWHM :math:`w_D` describes the Doppler effect: an
+  emitter moving with velocity component :math:`u` towards the observer
+  emits at :math:`\lambda_0(1 - u/c)`, and a Maxwellian distribution of
+  :math:`u` gives a Gaussian distribution of wavelengths,
+
+  .. math::
+
+     \phi_G(\Delta\lambda) = \frac{2}{w_D}\sqrt{\frac{\ln 2}{\pi}}
+       \exp\!\left[-4\ln 2\left(\frac{\Delta\lambda}{w_D}\right)^{2}\right].
+
+* A **Lorentzian** of FWHM :math:`w_L` describes the processes that
+  limit the duration of the emitted wave train (finite lifetime,
+  collisions). An exponentially damped wave train has the spectrum
+
+  .. math::
+
+     \phi_L(\Delta\lambda) = \frac{1}{\pi}\,
+       \frac{w_L/2}{\Delta\lambda^{2} + (w_L/2)^{2}} .
+
+  The Lorentzian has wide wings, :math:`\phi_L \propto
+  \Delta\lambda^{-2}`; the Gaussian falls off much faster.
+
+The Lorentzian mechanisms below are independent of each other, so their
+widths add: the convolution of two Lorentzians is a Lorentzian whose
+width is the sum of the two widths. The Doppler and Lorentz parts act
+together; the resulting profile is their convolution, the **Voigt
+profile** (section `The Voigt profile`_).
+
+Broadening of the atomic lines
+------------------------------
+
+``atomicLines::addEmissionAbsorption`` computes six widths per line and
+cell. The symbols are
+
+* :math:`\lambda_0` [m]: the line centre;
+* :math:`n`, :math:`T`, :math:`m`, :math:`r`: number density
+  [m\ :sup:`-3`], translational temperature [K], mass [kg] and
+  hard-sphere radius [m] of the emitting species (entries ``mass`` and
+  ``radius`` of the species, translational temperature of the cell
+  state);
+* :math:`n_j`, :math:`T_j`, :math:`m_j`, :math:`r_j`: the same for every
+  species :math:`j` of the cell state;
+  :math:`n_\mathrm{tot} = \sum_j n_j`,
+  :math:`\rho = \sum_j n_j m_j`;
+* :math:`n_e`, :math:`T_e`: electron density and temperature of the cell
+  state;
+* :math:`A_{ul}` [s\ :sup:`-1`], :math:`g_u`, :math:`g_l`: the Einstein
+  coefficient and the degeneracies given with the line in the transition
+  file; :math:`g(u)`, :math:`g(l)` the degeneracies of the upper and
+  lower levels; :math:`n_l` the population of the lower level
+  [m\ :sup:`-3`] from the population model (:doc:`/theory/populations`).
+
+.. note::
+
+   The sums over :math:`j` run over the species of the cell state, that
+   is over the **radiating species** of the case (the ``species``
+   dictionary of ``radiationProperties``). A gas component that is not
+   declared as a radiating species is not a perturber of the pressure
+   widths.
+
+Doppler width
+~~~~~~~~~~~~~
+
+The FWHM of the Gaussian of a Maxwellian emitter at :math:`T`:
+
+.. math::
+
+   w_D = \frac{\lambda_0}{c}\sqrt{\frac{8\,k\,T\,\ln 2}{m}} .
+
+The code writes :math:`\ln 2` as 0.69315.
+
+Natural width
+~~~~~~~~~~~~~
+
+A level :math:`x` decays radiatively at the rate :math:`\Gamma_x`; the
+line between two levels has a Lorentzian of angular-frequency FWHM
+:math:`\Gamma_u + \Gamma_l`, i.e. a frequency FWHM
+:math:`(\Gamma_u + \Gamma_l)/(2\pi)` (Laux 1993, Eq. 4.19, p. 33):
+
+.. math::
+
+   w_N = \frac{\lambda_0^{2}}{2\pi c}\,(\Gamma_u + \Gamma_l),
+   \qquad
+   \Gamma_x = \sum_{\text{lines leaving } x}
+     \frac{g_u^{\text{line}}}{g(x)}\,A .
+
+The weight :math:`g_u^{\text{line}}/g(x)` handles the lumped levels of
+the database: when a level :math:`x` groups several sublevels and a line
+starts from one of them only, its :math:`A` counts for the share of the
+states of :math:`x` that it leaves. :math:`\Gamma_x` is thus the mean
+decay rate per state of the level. A ground level has
+:math:`\Gamma = 0`.
+
+Phase-interruption (impact) width
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the impact approximation every collision of the emitter interrupts
+the phase of the wave train. With the collision frequency
+:math:`\nu_\mathrm{coll}` per emitter, the line is a Lorentzian of
+angular half width :math:`\nu_\mathrm{coll}`, i.e. a frequency FWHM
+:math:`\nu_\mathrm{coll}/\pi`. The code computes the hard-sphere
+collision rate per unit volume
+
+.. math::
+
+   Z = \sum_j 2\,n\,n_j\,\pi (r + r_j)^{2}
+       \sqrt{\frac{2\,k\,T_m\,(m + m_j)}{\pi\,m\,m_j}},
+   \qquad
+   T_m = \frac{m\,n\,T + m_j\,n_j\,T_j}{m\,n + m_j\,n_j},
+
+where :math:`\sqrt{2kT_m(m+m_j)/(\pi m m_j)}` is half the mean relative
+speed :math:`\bar g = \sqrt{8kT_m/(\pi\mu)}`, so that :math:`Z/n =
+\sum_j n_j\,\sigma_j\,\bar g_j` is the collision frequency per emitter.
+The width is
+
+.. math::
+
+   w_P = \frac{\lambda_0^{2}}{\pi c}\,\frac{Z}{n} .
+
+Resonance width
+~~~~~~~~~~~~~~~
+
+An emitter colliding with an atom of its own kind in the lower level of
+the line interacts through the resonant dipole-dipole force. The code
+uses the transition's own term of Griem (1964, p. 97), as written by
+Laux (1993, Eq. 4.20, p. 33), with the oscillator strength expressed
+through :math:`A_{ul}`, and takes twice the half width of that formula:
+
+.. math::
+
+   w_R = \frac{3}{16\pi^{3} c}\,
+         \sqrt{\frac{g_u}{g_l}}\,\lambda_0^{5}\,A_{ul}\,n_l ,
+   \qquad n_l = \frac{g_l}{g(l)}\,n(l) .
+
+Laux's formula is a half width at half maximum (his Eq. 4.20 is printed
+with the coefficient :math:`3e^2/(16\pi^2\varepsilon_0 m_e c^2) =
+6.72\times10^{-16}` m), hence the factor 2. :math:`n_l` is the number
+density of the line's own lower level, of weight :math:`g_l`: when the
+database lumps several levels into one level :math:`l` of weight
+:math:`g(l)` and population :math:`n(l)`, the line sees the share
+:math:`g_l/g(l)` (until 2026-11-16 the code used :math:`n(l)`, which
+overestimated the width of lines with a lumped lower level by
+:math:`g(l)/g_l`). The dsmcFoam escape factor (``spontaneousEmission``)
+uses the same full width since 2026-11-16.
+
+van der Waals width
+~~~~~~~~~~~~~~~~~~~
+
+Collisions with all other particles through the induced-dipole force
+use an empirical form, with the mean speed written as
+:math:`(3kT/\bar m)^{1/2}`, :math:`\bar m = \rho/n_\mathrm{tot}`:
+
+.. math::
+
+   w_\mathrm{vdW} = 20\,\frac{\lambda_0^{2}}{c}\;
+     4.5214\times10^{-18}\;n_\mathrm{tot}
+     \left(\frac{3\,k\,T\,n_\mathrm{tot}}{\rho}\right)^{0.3} .
+
+The numbers 20 and 4.5214e-18 are those of the verified version of the
+code (``docs/RADIATION_SPEC.md`` section 3.1, a PARADE-type empirical
+form); the code gives no other source.
+
+Stark width
+~~~~~~~~~~~
+
+The free electrons perturb the levels of the emitter through their
+electric field. For the neutral N and O lines this is the dominant
+pressure width in a shock layer. The code uses the electron-impact form
+of Johnston (2006, Eq. 3.13, p. 58): the half width at half maximum
+:math:`\Delta\lambda_{S,0}` [Angstrom] at :math:`T_e = 10^4` K and
+:math:`n_e = 10^{16}` cm\ :sup:`-3` is scaled as
+
+.. math::
+
+   \Delta\lambda_S = \Delta\lambda_{S,0}
+     \left(\frac{T_e}{10\,000\ \mathrm{K}}\right)^{n_S}
+     \frac{n_e}{10^{16}\ \mathrm{cm^{-3}}},
+
+and the full width in SI is
+
+.. math::
+
+   w_S = 2\,n_e\,s\,\left(\frac{T_e}{10^{4}}\right)^{n_S}\,10^{-32}
+   \quad [\mathrm{m}],
+
+with :math:`s = \Delta\lambda_{S,0}` (column 7 of the atomic transition
+file, in Angstrom), :math:`n_e` in m\ :sup:`-3`, and :math:`n_S` the
+entry ``starkExponent`` of the species. Since :math:`10^{16}`
+cm\ :sup:`-3` = :math:`10^{22}` m\ :sup:`-3` and one Angstrom is
+:math:`10^{-10}` m, the factor is :math:`10^{-10}/10^{22} = 10^{-32}`.
+
+* **Data.** The values of :math:`s` in ``database/atoms/N_I.dat`` and
+  ``O_I.dat`` are Johnston's tabulated :math:`\Delta\lambda_{S,0}`
+  (Appendix A, Tables A-1 to A-4), whose primary sources are Griem
+  (1974), Wilson and Nicolet (1967) or Johnston's least-squares fit
+  (Eq. 3.16, p. 59); the data file keeps the table, page and source of
+  each value (``database/SOURCES.md``, entry Johnston2006). Lines without
+  a Johnston value, and every N II and O II line, carry
+  :math:`s = 0`: they have no Stark broadening.
+* **Exponent.** Johnston gives :math:`n_S = 1/3` for most N and O lines
+  (Park 1982, as quoted by Johnston); the tutorials use
+  ``starkExponent 0.33``. The entry is required and applies to every
+  line of the species.
+* **Electron temperature.** :math:`T_e` is the electron temperature of
+  the cell state; when the cell state gives none (:math:`T_e \le 0`) the
+  population model supplies one (``electronTemperature``, the
+  temperature of the population model, see :doc:`/theory/populations`).
+  :math:`n_e = 0` gives :math:`w_S = 0`.
+
+Total Lorentz width
+~~~~~~~~~~~~~~~~~~~
+
+.. math::
+
+   w_L = w_S + w_\mathrm{vdW} + w_N + w_P + w_R .
+
+Lines whose upper level lies above the bound limit :math:`E_b` (the
+lowered ionisation limit of the population model) are skipped. A species
+with :math:`n < 10` m\ :sup:`-3` or :math:`T < 10` K contributes nothing.
+
+Broadening of the diatomic lines
+--------------------------------
+
+``diatomicBands`` computes its widths once per **vibrational transition**
+(not per rotational line), at :math:`\lambda_0 = 0.01/\bar\nu_0`, the
+band origin (:math:`\bar\nu_0` in cm\ :sup:`-1`). With
+:math:`M = m/\mathrm{amu}`, :math:`n` and :math:`T` the density and
+translational temperature of the radiator, the code evaluates
+(``diatomicBands.C``; forms kept from the verified version, class
+header items 11 and 12):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 82
+
+   * - Width
+     - Expression in the code [m]
+   * - Doppler
+     - :math:`w_G = 7.16\times10^{-7}\,\lambda_0\sqrt{T/M}`
+       (:math:`7.16\times10^{-7} = \sqrt{8k\ln 2/\mathrm{amu}}/c`)
+   * - self
+     - :math:`1.33\times10^{-29}\sqrt{2/M}\,\lambda_0^{2}\sqrt{T}\,n
+       \times 10^{-6}\times 10\times 10^{10}`
+   * - foreign
+     - :math:`5.85\times10^{-30}\sqrt{1/M + 1/M_f}\,\lambda_0^{2}\sqrt{T}\,n_f
+       \times 10^{-6}\times 10\times 10^{10}`
+   * - natural
+     - :math:`1.18\times10^{-14}` (a constant)
+   * - Stark
+     - :math:`10^{-8}\times 0.3\,(10^{-22}\max(n_e, 10^{-6}))^{0.6}\,
+       \lambda_0^{2}\times 10^{10}` (no :math:`T_e` dependence)
+
+with :math:`p = \sum_j n_j k T_j + n_e k T_e`,
+:math:`n_f = \max(p/(kT) - n,\ 10^{-40} p/(kT))` the foreign-gas density
+(:math:`10^{10}` if :math:`p \le 10^{-16}`), and :math:`M_f` the
+foreign-gas molar mass. The cgs/Angstrom factors are carried verbatim.
+As documented in the class header (item 11), :math:`M_f` is compared
+with its bounds in the wrong units, so it ends at 28.85 for any mixture
+and at 10 for a pure radiator. The Lorentz width is the sum of the four
+collision and radiative terms, and the Voigt width uses the simpler form
+
+.. math::
+
+   w_V = \frac{w_L}{2} + \sqrt{\frac{w_L^{2}}{4} + w_G^{2}} .
+
+The shape, its table and its placement are those of the atomic lines
+(below); the table is built once per vibrational transition and shared
+by all its rotational lines.
+
+The Voigt profile
+-----------------
+
+The convolution of the Gaussian and the Lorentzian,
+
+.. math::
+
+   \phi_V(\Delta\lambda) = \int_{-\infty}^{\infty}
+     \phi_G(\Delta\lambda')\,\phi_L(\Delta\lambda - \Delta\lambda')\,
+     \mathrm{d}\Delta\lambda' ,
+
+has no closed form. The code uses two empirical approximations, one for
+its width and one for its shape.
+
+Voigt width (atomic lines)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With :math:`d = (w_L - w_D)/(w_L + w_D)`, the form of Liu et al. (2001):
+
+.. math::
+
+   \beta = 0.023665\,e^{0.6\,d} + 0.00418\,e^{-1.9\,d},
+
+.. math::
+
+   R = 1 - 0.18121\,(1 - d^{2}) - \beta\,\sin(\pi d),
+
+.. math::
+
+   w_V = R\,(w_L + w_D) .
+
+The class name keeps Olivero and Longbothum (1977), whose width
+:math:`w_V = 0.5346\,w_L + \sqrt{0.2166\,w_L^{2} + w_D^{2}}` the form
+above replaces; the two agree within 3e-4 (relative). Against the width
+of the Voigt profile computed by numerical convolution, the Liu et al.
+form is within 1.1e-4 over :math:`10^{-3} \le w_L/w_D \le 10^{3}`, and
+the diatomic form :math:`w_L/2 + \sqrt{w_L^2/4 + w_G^2}` within 1.2e-2
+(Figure 1b).
+
+Whiting shape
+~~~~~~~~~~~~~
+
+With :math:`a = w_L/w_V` and :math:`x = |\lambda - \lambda_0|/w_V`,
+the shape of Whiting (1968) is
+
+.. math::
+
+   \phi(x) = c_1\,e^{-2.772\,x^{2}}
+           + \frac{c_2}{1 + 4x^{2}}
+           + 0.016\,c_2\,(1 - a)\,
+             \exp\!\left(-0.4\,x^{2.25} - \frac{10}{10 + x^{2.25}}\right),
+
+.. math::
+
+   c_0 = \frac{1}{(1.065 + 0.447\,a + 0.058\,a^{2})\,w_V},
+   \qquad c_2 = a\,c_0,
+   \qquad c_1 = c_0 - c_2 .
+
+The first term is a Gaussian of FWHM :math:`w_V`
+(:math:`2.772 \approx 4\ln 2`), the second a Lorentzian of FWHM
+:math:`w_V`, mixed in the proportion :math:`a`; :math:`c_0` is the peak
+value that gives unit area. The third term is a small correction of the
+wings.
+
+.. note::
+
+   Whiting's printed form of the correction is
+   :math:`\exp(-0.4x^{2.25}) - 10/(10 + x^{2.25})`; the code evaluates
+   :math:`\exp(-0.4x^{2.25} - 10/(10 + x^{2.25}))`, the form of the
+   verified version (``docs/RADIATION_SPEC.md`` 9.3.2). It acts only on
+   the term of amplitude :math:`0.016\,c_2(1 - a)`.
+
+.. figure:: /_static/figures/line_shapes/line_shapes_voigt.png
+   :width: 100%
+
+   Figure 1. (a) Normalised profile :math:`w_V\phi` of the code (present:
+   Whiting shape with the Liu et al. width) and the Voigt profile
+   obtained by numerical convolution (baseline), for
+   :math:`w_L/w_D = 0, 1, 20`. (b) Voigt width over
+   :math:`w_L + w_D` against :math:`d`. Script:
+   ``_static/figures/line_shapes/fig_line_shapes.py``.
+
+Truncation and cumulative table
+-------------------------------
+
+The profile is not evaluated at every grid point. For each line (atoms)
+or vibrational transition (molecules) the code builds the **cumulative
+profile**
+
+.. math::
+
+   C(\Delta\lambda) = \int_{-25 w_V}^{\Delta\lambda} \phi\,
+     \mathrm{d}\Delta\lambda'
+
+on 2001 points over :math:`|\Delta\lambda| \le 25\,w_V`:
+
+* the left half is a rectangle-rule sum from the far left wing, with the
+  step :math:`25\,w_V/1000`; the right half is the mirror image
+  :math:`C(+x) = 2C(0) - C(-x)`;
+* the table is divided by its value at :math:`+25\,w_V`, so the
+  truncated profile has unit area: the line wings beyond
+  :math:`\pm 25\,w_V` are cut and their share is redistributed over the
+  kept part. For a pure Lorentzian the share beyond
+  :math:`\pm 25\,w_V` is :math:`1 - (2/\pi)\arctan 50 = 1.3\,\%`; for a
+  Gaussian it is negligible;
+* the table is read by linear interpolation with the step
+  :math:`25\,w_V/1001`, not the :math:`25\,w_V/1000` it was built with
+  (verified-version form, ``docs/RADIATION_SPEC.md`` 9.4.1): the
+  profile used is the built one narrowed by the factor 1000/1001;
+* outside the table :math:`C = 0` (left) and :math:`C = 1` (right).
+
+A coarser pre-selection skips an atomic line entirely when the interval
+:math:`\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)` does not
+overlap the grid.
+
+Placement on the spectral grid
+------------------------------
+
+The spectral grid (:doc:`/classes/common`) has uniformly spaced points
+:math:`\lambda_i = \lambda_\mathrm{min} + i\,\Delta\lambda`,
+:math:`i = 0 \dots N-1`. Grid point :math:`i` represents the **bin**
+:math:`(\lambda_{i-1}, \lambda_i]`, with
+:math:`\lambda_{-1} = \lambda_\mathrm{min} - \Delta\lambda` for the
+first point, and receives the mean of the profile over its bin:
+
+.. math::
+
+   \phi_i = \frac{C(\lambda_i - \lambda_0) - C(\lambda_{i-1} - \lambda_0)}
+                 {\Delta\lambda} .
+
+The **footprint** of the line on the unbounded lattice
+:math:`\lambda_\mathrm{min} + i\,\Delta\lambda` runs from the point
+:math:`\lfloor(\lambda_0 - 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor`
+to the point
+:math:`\lfloor(\lambda_0 + 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor + 1`,
+whose bin holds the right end of the footprint, and is intersected with
+the grid. The consequences are:
+
+* **Conservation on any grid.** The bin values telescope:
+  :math:`\sum_i \phi_i\,\Delta\lambda = C(+25w_V) - C(-25w_V) = 1` for a
+  line inside the window, whatever the ratio of the line width to
+  :math:`\Delta\lambda`. A line narrower than one bin is placed in the
+  bin that contains it, with its whole area; it is not lost between two
+  grid points.
+* **Window edges.** A line cut by a window edge keeps only the bins
+  inside the window; nothing is lumped onto the edge points. The window
+  integral :math:`\sum_i j_i\,\Delta\lambda` therefore covers
+  :math:`(\lambda_\mathrm{min} - \Delta\lambda,\ \lambda_\mathrm{max}]`,
+  and two adjacent windows on the same lattice (the second starting one
+  :math:`\Delta\lambda` above the end of the first) add up to the wide
+  window.
+* **Sign of the absorption.** The emission is placed as
+  :math:`\max(0, \varepsilon)\,\phi_i`; the absorption :math:`k\,\phi_i`
+  keeps its sign, since :math:`k` is net of stimulated emission and is
+  negative for an inverted pair of levels (gain). The slab formula of
+  :doc:`/theory/transport` holds for either sign.
+
+The grid spacing still matters for the **shape** seen in the spectrum:
+with :math:`\Delta\lambda` comparable to :math:`w_V` a line appears as
+one or two bins. The integrated quantities (band radiance, window
+emission) are conserved, but a resolved spectrum needs
+:math:`\Delta\lambda` well below the narrowest Doppler width of interest
+(for N I 868 nm at 10 000 K, :math:`w_D \approx 2.35\times10^{-11}` m,
+``docs/RADIATION_SPEC.md`` 3.1).
+
+References
+----------
+
+* Griem, H. R. (1964), cited through Laux (1993), Eq. 4.20 (resonance
+  width); the full reference is not held in the repository.
+* Griem, H. R. (1974). *Spectral Line Broadening by Plasmas*. Academic
+  Press, New York and London.
+* Johnston, C. O. (2006). *Nonequilibrium Shock-Layer Radiative Heating
+  for Earth and Titan Entry*. PhD dissertation, Virginia Polytechnic
+  Institute and State University, Blacksburg, VA.
+* Laux, C. O. (1993). *Optical Diagnostics and Radiative Emission of Air
+  Plasmas*. PhD thesis, Stanford University.
+* Liu, Y., Lin, J., Huang, G., Guo, Y., Duan, C. (2001). Simple
+  empirical analytical approximation to the Voigt profile. *Journal of
+  the Optical Society of America B*, 18(5), 666.
+  doi:10.1364/JOSAB.18.000666
+* Olivero, J. J., Longbothum, R. L. (1977). Empirical fits to the Voigt
+  line width: a brief review. *Journal of Quantitative Spectroscopy and
+  Radiative Transfer*, 17(2), 233-236.
+  doi:10.1016/0022-4073(77)90161-3
+* Park, C. (1982), quoted by Johnston (2006) for the Stark exponent 1/3;
+  the full reference is not held in the repository.
+* Whiting, E. E. (1968). An empirical approximation to the Voigt
+  profile. *Journal of Quantitative Spectroscopy and Radiative Transfer*,
+  8(6), 1379-1384. doi:10.1016/0022-4073(68)90081-2
+* Wilson, K. H., Nicolet, W. E. (1967). Spectral absorption coefficients
+  of carbon, nitrogen, and oxygen atoms. *Journal of Quantitative
+  Spectroscopy and Radiative Transfer*, 7, 891-941.

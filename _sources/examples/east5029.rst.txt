@@ -1,0 +1,300 @@
+EAST shot 50-29 on a dsmcFoam run
+=================================
+
+Directory: ``tutorials/EAST/east5029/`` (``README.md``, ``Allrun``,
+``Allclean``, ``system/controlDict``, ``system/radiationProperties``).
+
+Purpose
+-------
+
+This is the deck the code was written for: the radiance of a nonequilibrium
+shock layer computed directly from the state-resolved populations of the gas
+kinetics, and measured as EAST measured it. It reads a dsmcFoam simulation of
+EAST shot T50-29 (10.29 km/s, 0.2 Torr air, 79 % N\ :sub:`2` / 21 %
+O\ :sub:`2`; Brandis and Cruden 2017, Table 1), takes the :math:`(n,v,J)`
+level populations sampled by dsmcFoam in every cell, and reproduces the two
+benchmark cameras of the shot, VUV and UV/Vis, with their line shapes,
+spatial resolution, shock-front definition, nonequilibrium metric and
+spectra.
+
+The deck does not run on its own: it needs the output of dsmcFoam. No result
+of it is shown here, because no complete dsmcFoam run of the shot is
+distributed with the tutorial.
+
+Physics shown
+-------------
+
+* **Populations from the DSMC distribution** (``populationModel
+  cellDistribution``, :doc:`/theory/populations`): the level populations of
+  every cell are those written by the dsmcFoam function object
+  ``dsmcRadiationDistribution``, with no assumption on their shape; each
+  distribution cell is matched to the nearest profile cell along the tube,
+  which gives :math:`T_\mathrm{trans}`, :math:`n` and the electrons (line
+  shapes).
+* **Radiators**: N\ :sub:`2` (``diatomicBands``), N and O (``atomicLines``,
+  NIST ASD 5.12 ionisation limits, Stark exponent 0.33 of Johnston 2006).
+* **The full EAST measurement** (:doc:`/theory/instrument`): sqrt-Voigt ILS,
+  composite SRF (optics triangle, camera sqrt-Voigt, gate top hat), front at
+  the peak radiance, nonequilibrium metric over :math:`\pm 2` cm, spectra at
+  the peak, as metric and as an equilibrium average.
+
+Input expected from dsmcFoam
+----------------------------
+
+From ``README.md``:
+
+#. A **reconstructed** dsmcFoam case of the shot (``reconstructPar`` done),
+   1-D along :math:`x`, shock frame, free stream entering at low :math:`x`.
+   ``profile { source dsmcCase; }`` reads the fields of its latest time:
+   ``rhoN_<s>`` [m\ :sup:`-3`], ``translationalT_<s>`` and ``internalT_<s>``
+   [K] of N\ :sub:`2`, N and O, and the electron fields ``rhoN_E-`` and
+   ``translationalT_E-`` (``dsmcVolFields`` names; check the names of your
+   run).
+#. The level distributions of every cell, written during the same run by the
+   function object ``dsmcRadiationDistribution`` of the plug-in
+   ``libdsmcRadiationCoupling`` (DSMC_Rovibronic repository,
+   ``src/lagrangian/DSMC/radiationCoupling``; format in
+   ``docs/RADIATION_COUPLING_SPEC.md``), in
+   ``<case>/postProcessing/dsmcRadiationDistribution/<name>/<time>/`` (the
+   index ``cells`` and one file ``cell<k>`` per cell). See
+   :doc:`/guide/dsmcfoam_coupling`.
+
+Case files
+----------
+
+``system/controlDict`` is the one-step dictionary of every radiationFoam
+case (``endTime 0``). ``system/radiationProperties`` starts with a header
+that cites every instrument value (Brandis and Cruden 2017, Tables C2, C4,
+D3, D4, transcribed in ``run/RAD/EAST/shots.csv`` of the DSMC_Rovibronic
+repository) and lists the values that are *not* published (FLAGS, below).
+Its main entries:
+
+.. code-block:: text
+
+   mode            shockTube1D;
+   populationModel cellDistribution;       // DSMC (n,v,J) populations
+
+   continuum       physical;               // bound-free and free-free of N, O, N+, O+
+
+   species
+   {
+       N2  { model diatomicBands; ... N2.dat }
+       N   { model atomicLines; ... N_I.dat;  continuumCoeffs { ... N_I_photoionisation.dat } }
+       O   { model atomicLines; ... O_I.dat;  continuumCoeffs { ... O_I_photoionisation.dat } }
+       N+  { model atomicLines; ... N_II.dat; continuumCoeffs { chargeNumber 1; } }
+       O+  { model atomicLines; ... O_II.dat; continuumCoeffs { chargeNumber 1; } }
+       N2+ { model diatomicBands; ... N2plus.dat }
+       NO  { model diatomicBands; ... NO.dat }
+   }
+
+   shockTube1DCoeffs
+   {
+       diameter            0.1016;         // [m], Sec. II p.2
+
+       windows
+       {
+           VUV     { minWavelength 150; maxWavelength 230; nPoints 40001; }
+           UVVis   { minWavelength 310; maxWavelength 510; nPoints 100001; }
+       }
+
+       bands                               // raw (unconvolved) bands [nm]
+       {
+           VUV_EAST        (162 218);
+           UVVis_EAST      (328 477);
+       }
+
+       profile
+       {
+           source      dsmcCase;
+           case        "$DSMC_CASE";               // set by Allrun
+           time        latestTime;
+           direction   x;
+           species     { N2 { } N { } O { } N+ { } O+ { } N2+ { } NO { } }
+           electrons   { numberDensity rhoN_E-; temperature translationalT_E-; }
+       }
+
+       distribution
+       {
+           directory   "$RADDIST_DIR";             // set by Allrun
+           direction   x;
+       }
+
+       writeSpectra        none;   // the raw spectra of ~1.3e4 cells are 1e10 values
+
+       instrument { VUV { ... } UVVis { ... } }
+   }
+
+``windows``
+   Each window is the camera range of 50-29 widened by the ILS cut-off on both
+   sides (VUV spectra 160-220 nm, profile 162-218 nm; UV/Vis spectra
+   320-500 nm, profile 328-477 nm), at 2 pm spacing.
+
+``profile``, ``distribution``
+   The two dsmcFoam inputs; ``$DSMC_CASE`` and ``$RADDIST_DIR`` are set by
+   ``Allrun``. With ``cellDistribution`` the cells measured are those of the
+   distribution files.
+
+The VUV camera:
+
+.. code-block:: cpp
+
+   VUV
+   {
+       window          VUV;
+
+       // ILS1, Table C2: wg 0.084 nm, wl 0.0025 nm (HWHM); FWHM 0.242 nm
+       spectralResponse
+       {
+           type            eastLineShape;
+           lengthUnit      nm;
+           form            sqrtVoigt;
+           halfWidthGauss  0.084;
+           halfWidthLorentz 0.0025;
+           cutoff          10;         // FLAG: not published
+       }
+
+       // SRF = f_opt (x) f_cam (x) f_motion, Table D3: d_opt 0.041 cm,
+       // camera wg 0.026 cm, wl 0.063 cm, d_gate 0.514 cm
+       spatialResponse
+       {
+           type            composite;
+           lengthUnit      cm;
+           functions
+           {
+               optics  { type trapezoid; baseWidth 0.041; topWidth 0; }
+               camera  { type eastLineShape; form sqrtVoigt;
+                         halfWidthGauss 0.026; halfWidthLorentz 0.063; cutoff 10; }
+               motion  { type topHat; width 0.514; }
+           }
+       }
+
+       bandUnit        nm;
+       bands           { VUV_EAST (162 218); }      // Fig. 9(b)
+
+       shockFront      { criterion peakRadiance; band VUV_EAST; upstreamSide low; }
+
+       distanceUnit    cm;
+       metricHalfWidth 2;              // Sec. III.B: +/- 2 cm
+       spatialBinWidth 0.005;          // 50 um bins (SRF ~0.5 cm)
+
+       spectra
+       {
+           nonequilibrium  { at peak; }
+           metric          { metric 2; }        // Fig. A7(b)
+           equilibrium     { average (3 4.5); } // FLAG: range not published
+       }
+   }
+
+The UV/Vis camera has the same structure with the 50-29 UV/Vis values: ILS
+:math:`w_G` = 0.28 nm, :math:`w_L` = 0.070 nm (Table C4, FWHM 0.923 nm);
+SRF optics 0.041 cm, camera :math:`w_G` = 0.021 cm, :math:`w_L` = 0.004 cm,
+gate 0.257 cm (Table D4); band ``UVVis_EAST (328 477)`` (Fig. 11(a)).
+
+``spatialBinWidth 0.005`` averages the DSMC cells over 50 µm bins before the
+measurement: the bins are ten times narrower than the SRF, and the field to
+convolve shrinks accordingly (:doc:`/theory/instrument`).
+
+FLAGS: values not published
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The header of the deck lists the instrument values that are provisional:
+
+* **The sqrt-Voigt normalisation range** (``cutoff``) of the ILS and of the
+  camera spatial function: Brandis and Cruden (2017) App. C say only that the
+  normalisation "is not expressed analytically, and must be done
+  numerically". The peak of the normalised ILS changes by 16 % (VUV) and 37 %
+  (UV/Vis) between cut-offs of 1 and 10 nm, the camera SRF peak by 33 % (VUV)
+  between 0.5 and 2 cm. Band integrals over the EAST windows are insensitive;
+  peak spectral radiance and profile peaks are not. The spatial cut-off of
+  10 cm reproduces the SRF tabulated on -10..10 cm in the public Test 59
+  release to 3 % of the peak; the spectral 10 nm has no evidence.
+* **The optics width**: Eq. D1 is a triangle of *base* :math:`d_\mathrm{opt}`
+  (used here, 0.041 cm); the public Test 57 release defines the same 0.041 cm
+  as a *half* width. The factor 2 is negligible against the gate top hat.
+* **The x range of the "equilibrium radiance"**: not stated (Sec. III.B);
+  3-4.5 cm behind the front is used.
+
+How to run
+----------
+
+.. code-block:: bash
+
+   cd tutorials/EAST/east5029
+   export DSMC_CASE=/path/to/reconstructed/dsmcFoam/case
+   ./Allrun                    # every distribution cell (hours: ~1e4 cells x 1e5 wavelengths)
+   STRIDE=10 ./Allrun          # every 10th distribution cell, copied into constant/radDist
+   RADDIST_DIR=<dir> ./Allrun  # another distribution block than the latest one
+   ./Allclean                  # removes postProcessing, constant and the logs
+
+``Allrun`` stops if ``DSMC_CASE`` is not a directory. Without
+``RADDIST_DIR`` it takes the latest time directory holding a ``cells`` file
+under ``$DSMC_CASE/postProcessing/dsmcRadiationDistribution/*/``. With
+``STRIDE`` :math:`k > 1` it copies every :math:`k`-th distribution cell (and
+the comment lines of ``cells``) into ``constant/radDist`` and points
+``RADDIST_DIR`` there.
+
+Output
+------
+
+In ``postProcessing/radiationFoam/`` (:doc:`/guide/post_processing`):
+
+* ``bands.csv``, ``profile.csv``: the raw (unconvolved) band radiance and the
+  cell states;
+* ``instrument_VUV_bands.csv``, ``instrument_UVVis_bands.csv``: the measured
+  band profile [W cm\ :sup:`-2` sr\ :sup:`-1`] against the distance behind
+  the front [cm], with :math:`x_0` and the nonequilibrium metric in the
+  header;
+* ``instrument_VUV_spectra.csv``, ``instrument_UVVis_spectra.csv``: the
+  ``nonequilibrium`` (at the peak), ``metric`` and ``equilibrium`` (mean over
+  3-4.5 cm) spectra [W cm\ :sup:`-2` sr\ :sup:`-1` µm\ :sup:`-1`].
+
+The equilibrium spectrum needs a domain extending at least 4.5 cm behind the
+front: on a shorter test domain radiationFoam stops at that spectrum with
+"x range ... is outside the profile", after writing the other outputs.
+
+Comparison with EAST
+--------------------
+
+The measured quantities are in the units and on the axes of Brandis and
+Cruden (2017): the band profiles against the VUV (162-218 nm, Fig. 9(b)) and
+UV/Vis (328-477 nm, Fig. 11(a)) profiles of 50-29, the metric with the
+nonequilibrium metric of the shot, and the three spectra with Figs. A7 (VUV)
+and A22 (UV/Vis). Digitised profiles and spectra, the tables of the paper and
+a reader of the calibrated EAST data cubes are in ``run/RAD/EAST/`` of the
+DSMC_Rovibronic repository (its ``README.md`` lists every source).
+
+.. note::
+
+   The deck radiates every air radiator whose (n,v,J) populations the
+   dsmcFoam deck of the shot samples (N, O, N\ :sup:`+`, O\ :sup:`+`,
+   N\ :sub:`2`, N\ :sub:`2`\ :sup:`+`, NO), with the bound-free and
+   free-free continuum, as the ``full`` variant of :doc:`east_equilibrium`.
+   The UV/Vis window (328-477 nm) is dominated by N\ :sub:`2`\ :sup:`+` first
+   negative and N\ :sub:`2` second positive (Cruden and Brandis 2020,
+   Table 4). O\ :sub:`2` (Schumann-Runge) is left out because the dsmcFoam
+   deck samples no O\ :sub:`2` distribution.
+
+   The dsmcFoam deck samples only the *upper* electronic states of the
+   molecular systems (N\ :sub:`2` A, B, C; N\ :sub:`2`\ :sup:`+` A, B;
+   NO A, B, C). With the default ``missingLevels zero`` the lower states
+   (N\ :sub:`2`\ :sup:`+` X, NO X) are empty, so these bands emit but do not
+   self-absorb. ``cellDistributionCoeffs { missingLevels boltzmannFill; }``
+   fills them at the species :math:`T_{\mathrm{el}}` of the cell
+   (:doc:`/theory/populations`).
+
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of
+  Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences
+  Meeting, AIAA Paper 2017-1145, 2017. doi:10.2514/6.2017-1145
+* Cruden, B. A. and Brandis, A. M., "Measurement of Radiative Nonequilibrium
+  for Air Shocks Between 7 and 9 km/s," *Journal of Thermophysics and Heat
+  Transfer*, 34 (1), 154-180, 2020. doi:10.2514/1.T5735
+* Johnston, C. O., *Nonequilibrium shock-layer radiative heating for Earth
+  and Titan entry*, PhD thesis, Virginia Polytechnic Institute and State
+  University, 2006.
+* Kramida, A., Ralchenko, Yu., Reader, J. and NIST ASD Team, NIST Atomic
+  Spectra Database (version 5.12), National Institute of Standards and
+  Technology, Gaithersburg, MD, 2024. doi:10.18434/T4W30F

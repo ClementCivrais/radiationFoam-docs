@@ -1,0 +1,231 @@
+Instrument model verification
+=============================
+
+Directory: ``tutorials/instrumentTests/`` (``Allrun``, ``Allclean``,
+``run_tests.py``, ``plot_style.py``).
+
+Purpose
+-------
+
+This tutorial verifies the instrument (measurement) model of
+:doc:`/theory/instrument` without the solver. ``run_tests.py`` writes input
+signals, drives the classes of ``src/radiation/instrument`` through the test
+application ``Test-radiationInstrument``, and compares every output with an
+analytical result or an independent Python transcription: 45 checks of the
+kernels, the discrete convolution, the edge conservation, the band integral,
+the shock-front criteria and the complete measurement of a field. It is the
+gate to pass after any change of the instrument code, and an example of how
+to test a new kernel.
+
+Requirements: ``Test-radiationInstrument`` on the path (built from
+``applications/test/radiationInstrument`` by ``Allwmake``), Python 3 with
+numpy, scipy and matplotlib.
+
+How the comparison is made
+--------------------------
+
+The library returns *bin averages* of the convolution (the bins are the
+midpoints between grid points, half bins at the ends; see
+:doc:`/theory/instrument`). Every analytical reference is therefore averaged
+over the same bins with exact antiderivatives, not sampled at the points. A
+reference written as a CDF :math:`C` gives, for a delta source of unit
+content at :math:`y_j` and with the window renormalisation of
+``conserveAtEdges``,
+
+.. math::
+
+   g_i = \frac{C(e_{i+1} - y_j) - C(e_i - y_j)}{\Delta_i\,\big[C(e_N - y_j) - C(e_0 - y_j)\big]} ,
+
+which the script compares with the C++ output. The figures show the present
+result as red markers and the analytical result as a black line.
+
+The tests
+---------
+
+``run_tests.py`` writes the inputs to ``cases/``, the test dictionary to
+``system/instrumentTests`` (one sub-dictionary per test, see
+:doc:`/classes/instrument` for the ``kind`` entries), runs
+``Test-radiationInstrument``, and writes ``summary.csv`` and ``figures/``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 48 30
+
+   * - Test
+     - What
+     - Reference
+   * - T1 (2 cases)
+     - Gaussian signal (:math:`\sigma` = 0.3 nm) through a Gaussian ILS
+       (:math:`\sigma` = 0.4 nm), uniform grid and stretched (sinh)
+       non-uniform grid
+     - Gaussian with the summed variances
+   * - T2a
+     - Top hat of the shock motion, :math:`U_s` = 10 km/s,
+       :math:`t_\mathrm{gate}` = 1 µs (1 cm), on a Gaussian profile
+     - erf form (antiderivative of :math:`\Phi`)
+   * - T2b
+     - Composite (Gaussian optics :math:`\otimes` top-hat motion) on a delta
+     - analytical Gaussian :math:`\otimes` top hat
+   * - T2c (2 cases)
+     - Composite of two top hats (1 cm and 0.4 cm) on a delta, default and
+       ``resolution 1000``
+     - trapezoid
+   * - T2d
+     - Top hat on a resolved step (tanh rise)
+     - numerically exact moving average, interior points
+   * - T3 (7 cases)
+     - Delta line through every ILS: ``gaussian``, ``trapezoid``, ``voigt``
+       exact and pseudo-Voigt, ``eastLineShape`` sqrt-Voigt and
+       Gauss + Lorentz, ``tabulated`` (an asymmetric, non-uniform table)
+     - independent CDFs (scipy ``voigt_profile``, analytic forms)
+   * - T4 (2 cases)
+     - Line 0.3 nm from the window edge, ``conserveAtEdges`` true and false
+     - integral conserved; analytic window mass lost
+   * - T6
+     - Band integral of a Gaussian line plus a linear background on a
+       non-uniform grid, four bands (line, all clipped, narrow, wing)
+     - integral of the linear interpolant; exact integral
+   * - T7 (2 profiles)
+     - Shock front on a logistic rise and on a peaked profile, non-uniform
+       grid
+     - known :math:`x_0` of each profile
+   * - T8
+     - Full ``measure``: separable Gaussian field, Gaussian ILS and Gaussian
+       SRF, bands ``line`` and ``full``, ``peakRadiance`` front
+     - analytical measured field, band profiles and front
+
+The 45 checks are: the integral conservation of each T1-T4 convolution with
+``conserveAtEdges true`` (15, tolerance :math:`10^{-12}`), the agreement
+with the reference of each T1, T2 and T3 case (14), the edge loss of T4
+false (1), two per T6 band (8), three front locations of T7 (3), and the
+field, the two band profiles and the front of T8 (4).
+
+How to run
+----------
+
+.. code-block:: bash
+
+   cd tutorials/instrumentTests
+   ./Allrun        # python3 run_tests.py > log.run_tests; prints the pass/fail count
+   ./Allclean      # removes cases, output, figures, system, summary.csv, logs
+
+``Allrun`` ends with a line ``checks: N pass, M fail (summary.csv)``. The two
+T8 field files (about 6 MB each) are deleted at the end of the script.
+
+Output
+------
+
+* ``summary.csv``: ``test,quantity,value,tolerance,pass`` per check;
+* ``output/``: the outputs of ``Test-radiationInstrument`` (``y,f,g`` per
+  convolution with the integrals in the header, band integrals, front
+  locations, T8 band profiles);
+* ``figures/``: one PNG and one PDF per figure;
+* ``log.Test-radiationInstrument``, ``log.run_tests``.
+
+Expected result
+---------------
+
+All 45 checks pass. Values from a run of the same tests in the
+DSMC_Rovibronic repository (``run/RAD/instrument_tests/summary.csv``,
+2026-11-14; that file also holds two checks of a kernel removed since, not
+listed here):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 46 27 27
+
+   * - Check
+     - Value
+     - Tolerance
+   * - integral conservation, every case
+     - :math:`\le 2.8\times10^{-16}`
+     - :math:`10^{-12}`
+   * - T1 uniform / non-uniform grid
+     - :math:`1.0\times10^{-13}` / :math:`1.9\times10^{-6}`
+     - :math:`10^{-9}` / :math:`2\times10^{-4}`
+   * - T2a top hat on Gaussian
+     - :math:`6.4\times10^{-6}`
+     - :math:`2\times10^{-5}`
+   * - T2b composite on delta
+     - :math:`6.0\times10^{-6}`
+     - :math:`10^{-4}`
+   * - T2c two top hats, resolution 200 / 1000
+     - :math:`5.0\times10^{-4}` / :math:`1.3\times10^{-5}`
+     - :math:`10^{-3}` / :math:`2\times10^{-4}`
+   * - T3 analytic CDFs (Gaussian, pseudo-Voigt, Gauss + Lorentz, tabulated)
+     - :math:`\le 6.9\times10^{-14}`
+     - :math:`10^{-7}`
+   * - T3 trapezoid
+     - :math:`3.2\times10^{-9}`
+     - :math:`10^{-7}`
+   * - T3 exact Voigt / sqrt-Voigt (tables)
+     - :math:`1.0\times10^{-4}` / :math:`5.7\times10^{-5}`
+     - :math:`2\times10^{-4}`
+   * - T2d top hat on step (absolute)
+     - :math:`2.6\times10^{-5}`
+     - :math:`10^{-4}`
+   * - T4 edge loss, ``conserveAtEdges false``
+     - :math:`1.2\times10^{-16}`
+     - :math:`10^{-12}`
+   * - T6 band vs linear interpolant
+     - :math:`\le 1.7\times10^{-15}`
+     - :math:`10^{-12}`
+   * - T6 band vs exact integral (narrow band)
+     - :math:`\le 7.7\times10^{-9}` (:math:`2.3\times10^{-4}`)
+     - :math:`2\times10^{-4}` (:math:`10^{-3}`)
+   * - T7 front locations
+     - :math:`\le 3.7\times10^{-7}` m
+     - :math:`2\times10^{-5}` m
+   * - T8 measured field / band profiles
+     - :math:`6.3\times10^{-12}` / :math:`\le 1.9\times10^{-4}`
+     - :math:`10^{-8}` / :math:`2\times10^{-3}`
+   * - T8 ``peakRadiance`` front
+     - :math:`2.2\times10^{-18}` m
+     - :math:`10^{-6}` m
+
+The tabulated kernels (exact Voigt, sqrt-Voigt, composite) are the only ones
+with a discretisation error, :math:`O(h^2)` of the table spacing, which is
+why their tolerances are larger; it decreases as expected when
+``resolution`` is raised (T2c). The T8 band profiles are compared with the
+*continuous* analytical band radiance, so their :math:`10^{-4}` difference is
+the grid error of the trapezoid band integral, not an error of the
+convolution.
+
+.. Source of the figures below (copied unchanged; same tests as run_tests.py, only the
+   plot-style import path differs):
+   ~/WORKSPACE/OpenFOAM/MNF-v2512-rovibronic-dlevel/run/RAD/instrument_tests/figures/
+   T3_delta_eastSqrtVoigt.png, T3_delta_voigtExact.png, T2b_composite_delta.png,
+   T7_shock_front.png, T8_band_line.png
+
+.. list-table::
+   :widths: 50 50
+
+   * - .. image:: /_static/figures/examples/instrumentTests_T3_delta_eastSqrtVoigt.png
+     - .. image:: /_static/figures/examples/instrumentTests_T3_delta_voigtExact.png
+   * - .. image:: /_static/figures/examples/instrumentTests_T2b_composite_delta.png
+     - .. image:: /_static/figures/examples/instrumentTests_T7_shock_front.png
+
+Top: a delta line through the sqrt-Voigt EAST ILS (:math:`w_G` = 0.12 nm,
+:math:`w_L` = 0.03 nm, cut-off 2.5 nm) and through the exact Voigt
+(:math:`f_G` = 0.30 nm, :math:`f_L` = 0.10 nm), log scale. Bottom left: the
+composite SRF (Gaussian optics :math:`\otimes` 1 cm gate top hat) on a delta.
+Bottom right: the three front criteria on a rising and a peaked profile.
+
+.. figure:: /_static/figures/examples/instrumentTests_T8_band_line.png
+   :width: 50%
+   :align: center
+
+   T8: measured band radiance (499-501 nm) of a separable Gaussian field
+   after a Gaussian ILS and a Gaussian SRF, present (red) and analytical
+   (black).
+
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of
+  Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences
+  Meeting, AIAA Paper 2017-1145, 2017. doi:10.2514/6.2017-1145
+* Thompson, P., Cox, D. E. and Hastings, J. B., *Journal of Applied
+  Crystallography*, 20, 79, 1987 (reference as given in
+  ``instrumentVoigt.H``).

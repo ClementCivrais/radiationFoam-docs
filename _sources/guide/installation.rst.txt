@@ -1,0 +1,202 @@
+Installation
+============
+
+radiationFoam is one OpenFOAM library, ``libradiationFoam``, one
+application, ``radiationFoam``, and one test application,
+``Test-radiationInstrument``. It is built against a plain OpenFOAM v2512
+(openfoam.com) and needs no other library: in particular, no DSMC library
+is needed to build or run it. The DSMC side of the coupling (the writer of
+the cell level distributions) belongs to the dsmcFoam+ repository and is
+described in :doc:`dsmcfoam_coupling`.
+
+Prerequisites
+-------------
+
+* **OpenFOAM v2512** (openfoam.com), compiled, with its environment
+  available (``etc/bashrc``). Nothing else is linked: the library uses
+  ``OpenFOAM``, ``finiteVolume`` and ``meshTools`` only
+  (``src/radiation/Make/options``).
+* **git**, to clone the repository.
+* **Python 3 with numpy, scipy and matplotlib** (optional). It is not used
+  by the build. It runs the database generators
+  (``src/radiation/database/sources``), the instrument test suite
+  (``tutorials/instrumentTests``) and the case generator of the EAST
+  equilibrium tutorial (``tutorials/EAST/equilibrium/make_cases.py``).
+* **Sphinx** (optional), to build the present documentation locally (last
+  section).
+
+Getting the source
+------------------
+
+.. code-block:: bash
+
+   git clone git@github.com:ClementCivrais/radiationFoam.git
+   cd radiationFoam
+
+The top level of the checkout holds:
+
+.. code-block:: text
+
+   radiationFoam/
+   ├── Allwmake, Allwclean            # build and clean scripts
+   ├── LICENSE                        # GNU GPL v3
+   ├── README.md
+   ├── src/radiation/                 # libradiationFoam (map: src/radiation/README.md)
+   │   └── database/                  # atoms/, molecules/, sources/, README.md, SOURCES.md
+   ├── applications/
+   │   ├── solvers/radiationFoam/     # the application
+   │   └── test/radiationInstrument/  # Test-radiationInstrument
+   ├── tutorials/                     # runnable cases, each with Allrun and Allclean
+   └── docs/                          # RADIATION_SPEC.md, RADIATION_PLAN.md,
+                                      # RADIATION_RESTRUCTURE.md, RADIATION_COUPLING_SPEC.md,
+                                      # OnlineDocumentation/ (this site)
+
+Building
+--------
+
+Source the OpenFOAM v2512 environment, point ``RADIATIONFOAM_DIR`` to the
+checkout and run ``Allwmake``:
+
+.. code-block:: bash
+
+   source <OpenFOAM-v2512>/etc/bashrc
+   export RADIATIONFOAM_DIR=$PWD      # the checkout: cases read the database through it
+   ./Allwmake
+
+``Allwmake`` runs, in this order,
+
+.. code-block:: bash
+
+   wmake libso src/radiation
+   wmake applications/solvers/radiationFoam
+   wmake applications/test/radiationInstrument
+
+and stops at the first failure. It parses the standard OpenFOAM
+``Allwmake`` arguments (``AllwmakeParseArguments``), so ``./Allwmake -j``
+builds in parallel.
+
+``RADIATIONFOAM_DIR`` is not used by the build. It is the variable through
+which the dictionaries name the database files, for example
+
+.. code-block:: c++
+
+   transitionFile  "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat";
+
+Every tutorial ``Allrun`` sets it to the checkout that holds the tutorial
+when it is not already set. Add the ``export`` line to your shell start-up
+file if you run your own cases.
+
+Where the files go
+------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Target
+     - Location
+     - Set by
+   * - ``libradiationFoam.so``
+     - ``$FOAM_USER_LIBBIN``
+     - ``src/radiation/Make/files``
+   * - ``radiationFoam``
+     - ``$FOAM_USER_APPBIN``
+     - ``applications/solvers/radiationFoam/Make/files``
+   * - ``Test-radiationInstrument``
+     - ``$FOAM_USER_APPBIN``
+     - ``applications/test/radiationInstrument/Make/files``
+   * - headers (``lnInclude``)
+     - ``src/radiation/lnInclude``
+     - ``wmake libso``
+
+``$FOAM_USER_LIBBIN`` and ``$FOAM_USER_APPBIN`` are the user directories of
+the sourced OpenFOAM environment (under ``$WM_PROJECT_USER_DIR/platforms``);
+both are on ``LD_LIBRARY_PATH`` and ``PATH`` after ``etc/bashrc``. The two
+applications link ``-lradiationFoam`` from ``$FOAM_USER_LIBBIN`` and include
+``src/radiation/lnInclude`` by a relative path, so they must be built from
+the same checkout as the library.
+
+Cleaning
+--------
+
+.. code-block:: bash
+
+   ./Allwclean
+
+runs ``wclean`` on the test application, the solver and the library
+(``wclean libso src/radiation``): the object files, ``lnInclude``, the
+library and the two binaries are removed. Run it before a rebuild when
+files have moved or been renamed.
+
+Checking the installation
+-------------------------
+
+1. **The binaries are found.**
+
+   .. code-block:: bash
+
+      which radiationFoam Test-radiationInstrument
+      radiationFoam -help
+
+2. **The instrument test suite passes.** It needs Python 3 with numpy,
+   scipy and matplotlib:
+
+   .. code-block:: bash
+
+      cd tutorials/instrumentTests
+      ./Allrun
+
+   ``run_tests.py`` writes the test inputs and ``system/instrumentTests``,
+   runs ``Test-radiationInstrument``, compares every output with an
+   analytic result or an independent Python transcription, and ``Allrun``
+   prints the count of passed and failed checks read from ``summary.csv``:
+
+   .. code-block:: text
+
+      checks: 45 pass, 0 fail (summary.csv)
+
+   Any row of ``summary.csv`` that ends in ``False`` is a failure (see
+   :doc:`tests`).
+
+3. **A single-cell spectrum runs.**
+
+   .. code-block:: bash
+
+      cd tutorials/singleCell_N
+      ./Allrun
+      head postProcessing/radiationFoam/spectrum.csv
+
+   The case takes less than a second; ``log.radiationFoam`` ends with
+   ``End``.
+
+Building the documentation locally
+----------------------------------
+
+The present site is a Sphinx project in ``docs/OnlineDocumentation``. Its
+Python requirements are pinned in ``requirements.txt`` (Sphinx 7-8,
+``sphinx-rtd-theme``, ``sphinx-copybutton``):
+
+.. code-block:: bash
+
+   cd docs/OnlineDocumentation
+   pip install -r requirements.txt     # or: make install-deps
+   make html                           # output in _build/html/index.html
+   make clean                          # removes _build
+
+To check that the pages build without warnings:
+
+.. code-block:: bash
+
+   python3 -m sphinx -W --keep-going -q -b html . _build/html
+
+The site is published by the GitHub workflow
+``.github/workflows/docs.yml`` on every push to ``main`` that changes
+``docs/OnlineDocumentation``: it runs ``make html`` and copies the HTML to
+the public repository ``ClementCivrais/radiationFoam-docs``.
+
+Next steps
+----------
+
+* :doc:`running`: set up and run a case.
+* :doc:`input_reference`: every keyword of ``system/radiationProperties``.
+* :doc:`/examples/index`: the tutorials, case by case.

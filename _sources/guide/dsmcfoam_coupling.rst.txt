@@ -1,0 +1,387 @@
+Coupling with dsmcFoam
+======================
+
+radiationFoam is built to compute radiation from the rovibronic DSMC solver
+built on dsmcFoam+ (White et al. 2018; the "DSMC_Rovibronic" repository,
+documentation at https://clementcivrais.github.io/DSMC_Rovibronic-docs/).
+In this solver every simulator particle carries its electronic, vibrational and rotational
+quantum numbers :math:`(n,v,J)` (Civrais et al. 2024). The populations of the radiating levels
+are therefore known cell by cell, without a temperature model, and the
+purpose of radiationFoam is to compute the radiance directly from them,
+with the same spectroscopic levels on both sides.
+
+The present page explains what crosses the interface, the DSMC-side
+plug-in that writes it, and the two-way coupling concept. It separates
+clearly what is **implemented** from what is **designed but not
+implemented**.
+
+Summary
+-------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 15 45
+
+   * - Piece
+     - Status
+     - Where
+   * - One-way: temperatures and number densities of a dsmcFoam case
+       (``dsmcVolFields``) read by radiationFoam
+     - implemented
+     - ``profile { source dsmcCase; }``,
+       ``src/radiation/profiles/shockTubeProfile``
+   * - One-way: sampled :math:`(n,v,J)` populations of every cell written
+       by dsmcFoam and read by radiationFoam
+     - implemented
+     - DSMC: ``dsmcRadiationDistribution``; radiationFoam:
+       ``populationModel cellDistribution``
+   * - One-way: any 1-D profile (other codes, synthetic profiles) as a
+       macro file
+     - implemented
+     - ``profile { source macroFile; }``
+   * - Electron-impact excitation and de-excitation of the atomic levels
+       inside DSMC
+     - implemented (DSMC side)
+     - ``electronImpactExcitation`` of ``libdsmcRadiationCoupling``
+   * - Radiative decay inside DSMC with a local escape factor of a uniform
+       cylinder
+     - implemented (DSMC side)
+     - ``spontaneousEmission`` of ``libdsmcRadiationCoupling``
+   * - Radiative decay of molecular levels inside DSMC
+     - not implemented
+     - ``docs/RADIATION_COUPLING_SPEC.md``, decision C.5-8
+   * - Photon transport in 2-D and 3-D, non-local two-way coupling
+       (event-coupled photon packets)
+     - design only
+     - ``docs/RADIATION_COUPLING_SPEC.md``
+
+The coupling is one-way between the two applications: dsmcFoam writes
+files, radiationFoam reads them, and nothing is passed back. The only
+radiative feedback on the gas that runs today is the local one inside
+dsmcFoam (``spontaneousEmission`` with its escape factor).
+
+Route 1: temperatures of a dsmcFoam case
+----------------------------------------
+
+The simplest route reads the macroscopic fields that ``dsmcVolFields``
+writes for each species :math:`s`:
+
+* ``rhoN_<s>``: number density [m\ :sup:`-3`];
+* ``translationalT_<s>``: translational temperature [K];
+* ``internalT_<s>``: the internal temperature [K], defined in dsmcFoam as
+  the one temperature whose Boltzmann distribution over the rovibronic
+  :math:`(n,v,J)` ladder of the species has the sampled mean internal
+  energy.
+
+radiationFoam reads them from a reconstructed time of the case
+(``shockTube1DCoeffs/profile``, ``source dsmcCase``) and re-expands
+Boltzmann populations with ``populationModel boltzmannTemperatures``.
+dsmcFoam writes no separate rotational, vibrational or electronic
+temperature (the internal state is rovibronic), so by default all three
+temperatures of the re-expansion are ``internalT_<s>``; any of them can be
+mapped to another field per species (:doc:`input_reference`). The electron
+density and temperature are given as field names (for example ``rhoN_E-``
+and ``translationalT_E-``) or as numbers.
+
+This route assumes the shape of the distribution. It is useful for checks
+and for flows close to equilibrium; it discards the state-resolved
+information of the DSMC.
+
+Route 2: sampled level populations
+----------------------------------
+
+The state-resolved route uses the cell distributions sampled by dsmcFoam:
+no shape is assumed for the distribution.
+
+The DSMC-side writer: ``dsmcRadiationDistribution``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``dsmcRadiationDistribution`` is a ``dsmcField`` (``fieldPropertiesDict``)
+of the plug-in library ``libdsmcRadiationCoupling``, in the DSMC
+repository (``src/lagrangian/DSMC/radiationCoupling/macroscopicProperties``,
+read-only for radiationFoam). It is loaded at run time:
+
+.. code-block:: c++
+
+   // system/controlDict of the dsmcFoam case
+   libs (dsmcRadiationCoupling);
+
+.. code-block:: c++
+
+   // system/fieldPropertiesDict of the dsmcFoam case
+   radDist
+   {
+       fieldModel  dsmcRadiationDistribution;
+       timeProperties { timeOption write; resetAtOutput on; }
+       dsmcRadiationDistributionProperties
+       {
+           fieldName   radDist;
+           zone        wholeMesh;                  // optional
+           species
+           {
+               N  { levelMap "<case>/constant/N.levelMap"; }
+               N2
+               {
+                   electronicStateLabels (X A B W Bp ap a w C);
+                   electronicStates      (0 1 2 8);  // optional
+                   minEnergy             0;          // optional [eV]
+                   maxEnergy             20;         // optional [eV]
+               }
+           }
+       }
+   }
+
+**Averaging.** At every sampling step each parcel :math:`p` of a selected
+species in a selected cell adds :math:`\Delta t\,W_p` to the accumulator of
+its level, with :math:`W_p` the number of real particles it represents
+(``nEquivalentParticles`` times its cell and radial weights). At a write
+time the number density of level :math:`(n,v,J)` is the time average
+
+.. math::
+
+   n(n,v,J) = \frac{\sum \Delta t\,W_p}{T\,V_\mathrm{cell}}
+   \qquad [\mathrm{m^{-3}}],
+
+with :math:`T` the averaging time and :math:`V_\mathrm{cell}` the volume of
+the cell open to the gas. It is the same average as the number density of
+``dsmcVolFields``. With ``resetAtOutput on`` every write time holds an
+independent block average. Only the populated levels of each cell are
+stored (a hash table per cell), so memory and output follow the populated
+states and never cells × levels. The number of parcel samples of each
+level (``parcelCounts``) is written too; the sampling noise of an entry is
+about :math:`n/\sqrt{N_\mathrm{samples}/N_\mathrm{corr}}`, with
+:math:`N_\mathrm{corr}` the number of correlated steps.
+
+**Output.** At each write time, in
+``postProcessing/dsmcRadiationDistribution/<fieldName>/<time>/``:
+
+* ``cells``: one row per selected cell, its index k, centre, volume and
+  the number density of each species. Cells are numbered in the order of
+  their centres (x, then y, then z), independently of the decomposition.
+* ``cell<k>``: the distribution of cell k, an OpenFOAM dictionary in the
+  format radiationFoam reads (:doc:`input_reference`, level-distribution
+  file), with extra entries radiationFoam ignores:
+
+.. code-block:: c++
+
+   cell 0; centre (x y z); volume V; averagingTime T; nSamples N;
+   N
+   {
+       numberDensity   9.6e20;     // all levels of the species
+       parcelSamples   123456;
+       levels ( (1) 9.5e20  (2 3) 1.2e18 ... );
+       parcelCounts ( ... );       // parcel samples per entry
+       g ( ... );                  // DSMC level weight per entry
+       energy ( ... );             // DSMC level energy per entry [J]
+       coverage complete;
+   }
+   N2
+   {
+       ... levels ( (X 0 12) 1.2e18 ... ); ...
+       coverage ( (X 0 0 98) (X 1 0 97) ... );
+   }
+
+Matching DSMC levels to spectroscopic levels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The key of an entry is what ``cellDistribution`` matches against the levels
+of the radiator (``radiationLevels``):
+
+* **Atoms.** A DSMC atomic level may lump several levels of the atomic
+  transition file. The writer reads a *level map* of the species (entry
+  ``levelMap``; one row per level of the DSMC ladder, generated in the DSMC
+  repository) and writes the labels of the transition-file levels the DSMC
+  level covers, e.g. ``(6 7 8)``. Without a level map the writer uses
+  ``dsmc<n>`` with a warning, and ``cellDistribution`` refuses such a file
+  rather than reading DSMC level n as radiation level n.
+* **Diatomics.** The key is exactly (electronic state, v, J). The state
+  label of DSMC state n is ``electronicStateLabels[n]`` and must be the
+  label of the molecule file of the database; labels that are not valid
+  words are written quoted (``"B'"``).
+
+**Statistical weights.** :math:`n(n,v,J)` is the number density of the
+whole DSMC level, all its degenerate states. ``cellDistribution`` splits an
+entry over the spectroscopic levels :math:`i` it covers in proportion to
+their weights,
+
+.. math::
+
+   n_i = N\,\frac{g_i}{\sum_{j\in\mathrm{entry}} g_j},
+
+so the levels of a degenerate group are equally populated per state. When
+the file gives the DSMC weight :math:`g_D` of the entry and
+:math:`g_D>\sum_j g_j` (a DSMC level with states that have no spectroscopic
+level, such as the complete hydrogenic Rydberg shells of the atomic
+ladders), the split is :math:`n_i=N g_i/g_D`: the same population per state
+over the whole DSMC level. The population left on states without a
+spectroscopic level is reported in the log.
+
+**Levels the DSMC does not carry.** Levels of the transition data with no
+entry get :math:`n_i=0` (``missingLevels zero``, default) or a Boltzmann
+population at the species electronic temperature of the cell
+(``missingLevels boltzmannFill``). The ``coverage`` entry tells which
+levels the DSMC ladder carried in the averaging block: a carried level
+that received no parcel keeps its sampled value 0 and is never filled, so
+that the estimator stays unbiased. The filled share of the emission is
+written to ``cellDistributionFill.csv``.
+
+The radiationFoam side
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: text
+
+   mode            shockTube1D;
+   populationModel cellDistribution;
+   cellDistributionCoeffs { missingLevels zero; }      // or boltzmannFill
+
+   shockTube1DCoeffs
+   {
+       ...
+       profile                       // n, T_trans and the electrons (line widths)
+       {
+           source      dsmcCase;
+           case        "$DSMC_CASE";
+           time        latestTime;
+           species     { N2 { } N { } O { } }
+           electrons   { numberDensity rhoN_E-; temperature translationalT_E-; }
+       }
+       distribution                  // level populations of every cell
+       {
+           directory   "$DSMC_CASE/postProcessing/dsmcRadiationDistribution/radDist/1e-05";
+           direction   x;
+       }
+   }
+
+Each distribution cell is matched to the nearest profile cell along the
+tube (``matchTolerance``); the profile cell gives the translational
+temperatures, number densities and electrons used by the line widths, the
+distribution gives the level populations. For a single cell, use
+``mode singleCell`` with ``cellState/distributionFile``. A complete deck is
+``tutorials/EAST/east5029`` (:doc:`/examples/east5029`).
+
+Conversely, ``shockTube1D`` can write the populations it used
+(``writeDistributions``) in the same format, so that a Boltzmann profile
+can be replayed through ``cellDistribution``: the two population models are
+then compared on identical inputs.
+
+Radiative processes inside dsmcFoam
+-----------------------------------
+
+Two further classes of ``libdsmcRadiationCoupling`` act on the DSMC
+particles themselves (``chemReactDict``, ``reactionModel``). They are part
+of the DSMC solver, not of radiationFoam; they are summarised here because
+they define the coupling of the electronic states to the radiation field.
+
+``electronImpactExcitation`` (implemented). Excitation and de-excitation
+of the atomic levels by electron impact on their dipole pairs, with Bethe
+cross sections from the database oscillator strengths,
+
+.. math::
+
+   \sigma_{lu}(E) = 4\pi a_0^2 \left(\frac{E_H}{\Delta E}\right)^2
+   f_{lu}\,\frac{\ln x}{x}, \qquad x = E/\Delta E > 1,
+
+(:math:`a_0` the Bohr radius, :math:`E_H` the Rydberg energy,
+:math:`\Delta E` the level spacing of the DSMC ladder, :math:`f_{lu}` the
+absorption oscillator strength) and the reverse by the Klein-Rosseland
+relation at the event energy, so that detailed balance is exact state by
+state.
+
+``spontaneousEmission`` (implemented). Radiative decay of the atomic
+levels. Every parcel carries an exponential clock: in level :math:`s` of
+total decay rate :math:`\Gamma_s=\sum_t A^\mathrm{eff}_{st}` it decays after
+:math:`\tau=-\ln U/\Gamma_s` to level :math:`t` with probability
+:math:`A^\mathrm{eff}_{st}/\Gamma_s`, the photon energy leaves the gas and
+is booked as radiated. The effective rate of a DSMC pair :math:`u\to l`
+sums the spin-allowed lines :math:`j\to i` it contains, each multiplied by
+an escape factor :math:`\Lambda_{ji}`,
+
+.. math::
+
+   g_u A^\mathrm{eff}_{ul} = \sum_{j\in u,\,i\in l} g_j A_{ji}\,\Lambda_{ji}.
+
+**Escape factor** (``geometry cylinder``). :math:`\Lambda` is the mean
+probability that a photon emitted in a uniform infinite cylinder of radius
+:math:`R` (the shock-tube radius, given in ``constant/radiationProperties``
+of the dsmcFoam case) leaves it without being absorbed. It depends on the
+line-centre optical depth across the radius and the Voigt parameter,
+
+.. math::
+
+   \tau_0 = \frac{K\,\mathrm{erfcx}(a)}{\sigma\sqrt{2\pi}}\,R, \qquad
+   K = \frac{\lambda^2}{8\pi}\frac{g_j}{g_i} A_{ji}\, n_i
+       \left[1-\frac{n_u/g_u}{n_l/g_l}\right], \qquad
+   a = \frac{\gamma}{\sqrt{2}\,\sigma},
+
+with :math:`\sigma=(\nu_0/c)\sqrt{kT_X/m_X}` the Doppler width (in
+frequency) and :math:`\gamma` the Lorentz half width (natural, Stark,
+resonance and van der Waals). The populations, densities and temperatures
+are time averages of the cell over ``updateInterval`` steps, and
+:math:`\Lambda(\tau_0,a)` is interpolated in a table (``escapeCylinder.table``)
+generated in the DSMC repository. ``geometry thin`` sets :math:`\Lambda=1`.
+
+This is a **local** model: the photon either escapes the tube or is
+re-absorbed where it was emitted. It is exact for a uniform tube, and it
+is the uniform-tube limit of the packet transport below.
+
+Two-way coupling concept (design, not implemented)
+--------------------------------------------------
+
+``docs/RADIATION_COUPLING_SPEC.md`` (dated 2026-11-14, "Status: design
+only. No solver source was changed.") designs the non-local two-way
+coupling for 2-D and 3-D flows. Its main points:
+
+**State-resolved radiative rates.** The DSMC already performs every
+radiative decay as an event of one parcel. The radiation field enters the
+gas kinetics only through the absorption and stimulated-emission rates of
+each radiative pair, i.e. through state-resolved radiative rates per cell.
+The question is how to obtain them consistently.
+
+**Mean-field rates with the escape factor, evaluated and not retained as
+the coupling.** A first concept lags the state-resolved rates from a mean
+radiation field :math:`\bar J` and uses the local escape factor as an
+accelerated-lambda-iteration preconditioner. The specification evaluates
+it at the equilibrium state of EAST shot 50-29 (Brandis and Cruden
+2017): at the cell scale the escape-factor
+preconditioner multiplies the error by -3.0 to -104 per coupling window
+for the VUV resonance lines, i.e. it diverges; the cell-diagonal
+(Rybicki-Hummer) split converges but needs 2.5 to 153 windows per decade;
+lagged rates close energy only in expectation. The mean-field transport is
+kept as a deterministic reference, for the one-way spectra and as a
+fallback.
+
+**Recommended: event-coupled photon packets.** Each DSMC decay event
+launches a photon packet that carries exactly the transition energy
+:math:`W_e(\varepsilon_u-\varepsilon_l)`. The packet is traced through the
+mesh with the cell opacity of the time-averaged absorber populations, and
+ends absorbed by a parcel (bound-bound, photoionisation or free-free), by a
+wall face, or leaving the domain. Energy is exact per event, with a bank
+for weight and line-overlap mismatches; absorption is the exact reverse of
+emission, so detailed balance holds in a Planck cavity (to
+:math:`O(10^{-4})` in the specification's estimate). The specification
+estimates about 3.3 packets per step for the whole EAST 50-29 deck, set by
+the physical rate of radiative events.
+
+**Planned classes** (specification, section C.1): photon trackers
+(``polyMesh3D``, ``axisymmetricRevolved``, ``tube1D``), a cell opacity
+class, a photon Monte Carlo and a ray-tracing transport in the library,
+radiationFoam modes ``axisymmetric`` and ``threeD``, and on the DSMC side a
+``photonTransport`` controller, a coupled mode of ``spontaneousEmission``
+and a ``radiativeRecombination`` process. None of these exist in the
+present code; the specification lists the decisions still open for the
+user (section C.5).
+
+References
+----------
+
+* Civrais, C. H. B., Pfeiffer, M., White, C. and Steijl, R. (2024).
+  Modelling of the electronic excited states in high-temperature flows.
+  Physics of Fluids, 36(8), 086112. doi:10.1063/5.0215853.
+* Brandis, A. M. and Cruden, B. A. (2017). Benchmark shock tube
+  experiments of radiative heating relevant to Earth re-entry. 55th AIAA
+  Aerospace Sciences Meeting, AIAA Paper 2017-1145.
+  doi:10.2514/6.2017-1145.
+* White, C., Borg, M. K., Scanlon, T. J., Longshaw, S. M., John, B.,
+  Emerson, D. R. and Reese, J. M. (2018). dsmcFoam+: An OpenFOAM based
+  direct simulation Monte Carlo solver. Computer Physics Communications,
+  224, 22-43. doi:10.1016/j.cpc.2017.09.030.

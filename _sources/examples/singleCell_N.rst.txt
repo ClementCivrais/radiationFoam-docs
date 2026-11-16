@@ -1,0 +1,188 @@
+singleCell_N: one cell of atomic nitrogen
+=========================================
+
+Directory: ``tutorials/singleCell_N/``.
+
+Purpose
+-------
+
+The smallest radiationFoam case: one uniform cell of atomic nitrogen, no mesh
+and no transport. It computes the spectral emission coefficient
+:math:`j_\lambda` and absorption coefficient :math:`\kappa_\lambda` of the
+N I lines in a narrow window around the 868 nm multiplet, and the level
+populations they come from. It is the case to run first after an
+installation, and the template for checking a single line list or a single
+population model.
+
+Physics shown
+-------------
+
+* **Boltzmann populations from temperatures** (``populationModel
+  boltzmannTemperatures``): the levels of N I are populated at the
+  electronic temperature of the cell, 10 000 K, up to the bound limit set by
+  ``ionisationEnergy`` (:doc:`/theory/populations`).
+* **Bound-bound line emission and absorption** (``model atomicLines``,
+  :doc:`/theory/atomic_lines`): the three lines of the multiplet in the
+  window, at vacuum wavelengths 868.27, 868.58 and 868.85 nm in the database
+  file ``N_I.dat`` (NIST ASD 5.12 Ritz wavelengths, Kramida et al. 2024).
+* **Line shapes** (``lineShape voigtWhitingOliveroLongbothum``,
+  :doc:`/theory/line_shapes`): Doppler width from the translational
+  temperature (20 000 K), Lorentz width from Stark broadening by the
+  electrons (:math:`n_e` = 10\ :sup:`21` m\ :sup:`-3`, :math:`T_e` = 10 000 K,
+  exponent 0.33 of Johnston 2006, Eq. 3.13), natural, resonance, van der Waals
+  and phase broadening.
+
+Case files
+----------
+
+.. code-block:: text
+
+   singleCell_N/
+       Allrun, Allclean
+       system/controlDict              endTime 0: one evaluation, nothing to march
+       system/radiationProperties      the whole case
+
+``system/radiationProperties``:
+
+.. code-block:: cpp
+
+   mode            singleCell;
+   populationModel boltzmannTemperatures;
+
+   spectralGrid
+   {
+       minWavelength       867.9;     // [nm]
+       maxWavelength       869.2;     // [nm]
+       nPoints             1000;
+   }
+
+   species
+   {
+       N
+       {
+           model           atomicLines;
+           mass            2.326e-26;      // [kg]
+           radius          0.7e-10;        // [m]
+           atomicLinesCoeffs
+           {
+               transitionFile      "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat";
+               ionisationEnergy    117225.7;      // [cm^-1], NIST ASD v5.12
+               starkExponent       0.33;          // Johnston (2006) Eq. 3.13
+               lineShape           voigtWhitingOliveroLongbothum;
+           }
+       }
+   }
+
+   cellState
+   {
+       electronNumberDensity   1e21;           // [m^-3]
+       electronTemperature     10000;          // [K]
+       species
+       {
+           N
+           {
+               numberDensity               1e21;   // [m^-3]
+               translationalTemperature    20000;  // [K]
+               electronicTemperature       10000;  // [K]
+           }
+       }
+   }
+
+Key entries:
+
+``mode singleCell``
+   One cell state, the coefficients on one grid, no transfer
+   (:doc:`/classes/transport`).
+
+``spectralGrid``
+   A uniform grid of ``nPoints`` vacuum wavelengths from ``minWavelength`` to
+   ``maxWavelength`` [nm]; here a spacing of 1.3 pm, well below the line
+   widths.
+
+``species/N``
+   The radiator: ``mass`` sets the Doppler width, ``radius`` (hard-sphere
+   radius) the phase-interrupting collision width. ``transitionFile`` points
+   to the database, expanded from ``$RADIATIONFOAM_DIR``.
+   ``ionisationEnergy`` is the N I ionisation limit; levels above the bound
+   limit are not populated and their lines are skipped.
+
+``cellState``
+   The state of the cell: electron density and temperature (Stark width),
+   and per species the number density, the translational temperature
+   (Doppler) and the electronic temperature (Boltzmann populations). A species
+   without ``electronicTemperature`` is left in its lowest level(s), with a
+   warning.
+
+How to run
+----------
+
+.. code-block:: bash
+
+   cd tutorials/singleCell_N
+   ./Allrun          # runs radiationFoam, log in log.radiationFoam
+   ./Allclean        # removes postProcessing/ and the logs
+
+The run takes about a second. The log lists, per species,
+:math:`4\pi\int j_\lambda\,\mathrm{d}\lambda` [W m\ :sup:`-3`] and
+:math:`\int\kappa_\lambda\,\mathrm{d}\lambda` [m\ :sup:`-1` m] over the
+window.
+
+Output
+------
+
+In ``postProcessing/radiationFoam/`` (:doc:`/guide/post_processing`):
+
+* ``spectrum.csv``: ``wavelength`` [nm], ``emission_coefficient``
+  :math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`],
+  ``absorption_coefficient`` :math:`\kappa_\lambda` [m\ :sup:`-1`];
+* ``populations_N.csv``: ``key, g, energy`` [J], ``number_density``
+  [m\ :sup:`-3`] of every level.
+
+Plotting
+--------
+
+.. code-block:: python
+
+   import numpy as np, matplotlib.pyplot as plt
+   d = np.genfromtxt('postProcessing/radiationFoam/spectrum.csv',
+                     delimiter=',', names=True)
+   fig, ax = plt.subplots()
+   ax.plot(d['wavelength'], d['emission_coefficient'], 'r-')
+   ax.set_xlabel('Wavelength (nm)')
+   ax.set_ylabel(r'$j_\lambda$ (W m$^{-3}$ sr$^{-1}$ m$^{-1}$)')
+   fig.savefig('emission.png')
+
+   p = np.genfromtxt('postProcessing/radiationFoam/populations_N.csv',
+                     delimiter=',', names=True, dtype=None, encoding=None)
+   # Boltzmann check: ln(n_i/g_i) is linear in E_i with slope -1/(k T_el)
+
+Expected result
+---------------
+
+Three Voigt lines at 868.27, 868.58 and 868.85 nm, in the order of their
+:math:`g_u A_{ul}` (upper-level degeneracies 8, 6, 4 and
+:math:`A_{ul}` = 2.53, 1.88, 1.15 :math:`\times 10^7` s\ :sup:`-1` in
+``N_I.dat``), all three from the same lower term. Absorption has the same
+shape. In ``populations_N.csv``, :math:`\ln(n_i/g_i)` falls linearly with the
+level energy with slope :math:`-1/(k_B \times 10\,000\ \mathrm{K})` up to the
+bound limit.
+
+A single-cell N I case of this kind was verified during development against
+the PICLas regression case ``Rad_Emission_SingleCell_N`` (a past
+verification reference, with the PICLas line file and constants): the
+emission and absorption coefficients agreed to :math:`4.5\times10^{-6}`
+relative, the regression tolerance being :math:`10^{-5}`
+(``run/RAD/compare_singleCell.csv`` of the DSMC_Rovibronic repository). The
+tutorial now reads the radiation database, so its numbers differ from that
+reference; see :doc:`/reference/verification`.
+
+
+References
+----------
+
+* Johnston, C. O., *Nonequilibrium shock-layer radiative heating for Earth
+  and Titan entry*, PhD thesis, Virginia Polytechnic Institute and State
+  University, 2006.
+* Kramida, A., Ralchenko, Yu., Reader, J. and NIST ASD Team, NIST Atomic
+  Spectra Database (version 5.12), National Institute of Standards and
+  Technology, Gaithersburg, MD, 2024. doi:10.18434/T4W30F

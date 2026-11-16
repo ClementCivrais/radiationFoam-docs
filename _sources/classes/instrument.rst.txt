@@ -1,0 +1,533 @@
+Instrument classes
+==================
+
+Source: ``src/radiation/instrument/``.
+
+.. code-block:: text
+
+   instrument/
+       instrumentFunctions/
+           basic/instrumentFunction/        abstract kernel, discrete convolution
+           derived/instrumentGaussian/      gaussian
+           derived/instrumentVoigt/         voigt
+           derived/instrumentTopHat/        topHat
+           derived/instrumentTrapezoid/     trapezoid
+           derived/instrumentTabulated/     tabulated
+           derived/instrumentComposite/     composite
+           derived/instrumentEastLineShape/ eastLineShape
+       shockTubeInstrument/                 measurement model of one camera
+
+The physics of every class (kernel formulas, discrete convolution, shock
+front criteria, units) is in :doc:`/theory/instrument`. This page lists the
+run-time names and the dictionary keywords as the code reads them. The
+instrument is used by the ``shockTube1D`` transport mode
+(:doc:`/classes/transport`) and by the test application
+``Test-radiationInstrument``.
+
+
+instrumentFunction (base class)
+-------------------------------
+
+Files: ``instrumentFunctions/basic/instrumentFunction/instrumentFunction.{H,C}``,
+``instrumentFunctionNew.C``.
+
+Abstract base of every instrument response function: a normalised kernel
+:math:`K(s)` [1/length] of the offset :math:`s`, used for the spectral
+instrument line shape (ILS, ``spectralResponse``) and the spatial resolution
+function (SRF, ``spatialResponse``). It is selected by run-time selection on
+the ``type`` entry of its dictionary.
+
+.. list-table:: Keywords common to every type
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``type``
+     - word
+     - (required)
+     - Run-time name of the derived class (below).
+   * - ``lengthUnit``
+     - word
+     - ``m``
+     - Unit of every width of the dictionary: ``m``, ``cm``, ``mm``, ``um``,
+       ``nm``. Stored lengths are always SI.
+   * - ``conserveAtEdges``
+     - bool
+     - ``true``
+     - Renormalise each kernel to the part inside the window, so the
+       trapezoid integral is conserved; ``false`` loses the content scattered
+       beyond the window edges.
+
+Main member functions:
+
+* ``cdf(s)``, ``pdf(s)``: :math:`C(s)` and :math:`K(s)`; by default those of
+  the piecewise-linear table set by ``setTable(nodes, density)`` (exact CDF of
+  the linear density, normalised to unit area);
+* ``support()``: half range beyond which :math:`K = 0` [m];
+* ``width()``: characteristic full width [m] (pure virtual);
+* ``convolve(y, f)``: bin-averaged discrete convolution on an increasing,
+  possibly non-uniform grid (virtual, so a derived class can replace it);
+* ``trapezoid(y, f)`` (static): the trapezoid integral that ``convolve``
+  conserves.
+
+The removed type ``piclasInstrBroadening`` stops with a ``FatalIOError``
+that points to ``trapezoid``.
+
+
+gaussian
+--------
+
+Class ``instrumentGaussian``. Gaussian of given FWHM (or standard deviation),
+analytic CDF.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``fwhm``
+     - scalar
+     - (required unless ``sigma``)
+     - Full width at half maximum [lengthUnit].
+   * - ``sigma``
+     - scalar
+     - (optional)
+     - Standard deviation [lengthUnit]; used instead of ``fwhm`` when present.
+   * - ``cutoff``
+     - scalar
+     - ``10``
+     - Kernel cut at :math:`|s|` = cutoff :math:`\times\,\sigma`.
+
+``width()`` returns the FWHM.
+
+.. code-block:: cpp
+
+   spectralResponse { type gaussian; lengthUnit nm; fwhm 0.5; }
+
+
+voigt
+-----
+
+Class ``instrumentVoigt``. Voigt from the FWHM of its Gaussian and
+Lorentzian parts, either tabulated exactly or as the pseudo-Voigt of
+Thompson, Cox and Hastings (1987).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``fwhmGauss``
+     - scalar
+     - (required)
+     - Gaussian FWHM :math:`f_G` [lengthUnit], :math:`\ge 0`.
+   * - ``fwhmLorentz``
+     - scalar
+     - (required)
+     - Lorentzian FWHM :math:`f_L` [lengthUnit], :math:`\ge 0`, not both zero.
+   * - ``form``
+     - word
+     - ``exact``
+     - ``exact`` (tabulated :math:`G\otimes L`) or ``pseudoVoigt``.
+   * - ``cutoff``
+     - scalar
+     - ``100``
+     - Half range in units of the Olivero-Longbothum width :math:`f_V`.
+   * - ``resolution``
+     - scalar
+     - ``100``
+     - Table nodes per :math:`f_V` (``exact`` only).
+
+``width()`` returns :math:`f_V = 0.5346 f_L + \sqrt{0.2166 f_L^2 + f_G^2}`.
+
+
+topHat
+------
+
+Class ``instrumentTopHat``. Centred top hat (square wave) of full width
+:math:`w`; the camera gate smear :math:`d_\mathrm{gate} = U_s t_\mathrm{gate}`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``width``
+     - scalar
+     - (required unless the pair below)
+     - Full width [lengthUnit].
+   * - ``shockSpeed``
+     - scalar
+     - (with ``gateTime``)
+     - Shock speed :math:`U_s` [m/s], always SI.
+   * - ``gateTime``
+     - scalar
+     - (with ``shockSpeed``)
+     - Gate (exposure) time [s], always SI; :math:`w = U_s t_\mathrm{gate}`.
+
+
+trapezoid
+---------
+
+Class ``instrumentTrapezoid``. Symmetric trapezoid of bottom width :math:`b`
+and top width :math:`t`, unit area (height :math:`2/(b+t)`); :math:`t = 0` is
+the triangle of the EAST optics (Brandis and Cruden 2017, Eq. D1),
+:math:`t > 0` the trapezoid of Eq. D3. The density is linear on the nodes
+:math:`-b/2, -t/2, t/2, b/2`, so the table CDF is exact. :math:`t = b` gives a
+top hat.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``baseWidth``
+     - scalar
+     - (required)
+     - Bottom width :math:`b > 0` [lengthUnit].
+   * - ``topWidth``
+     - scalar
+     - ``0``
+     - Top width :math:`0 \le t \le b` [lengthUnit].
+
+``width()`` returns :math:`b`.
+
+
+tabulated
+---------
+
+Class ``instrumentTabulated``. Kernel read from a two-column ASCII file
+(offset in ``lengthUnit``, response of any scale; ``#`` lines are comments;
+offsets increasing, responses :math:`\ge 0`), e.g. a measured ILS. Linear
+between the nodes, normalised to unit area over the file range.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``file``
+     - fileName
+     - (required)
+     - Path of the table, expanded with ``fileName::expand`` (environment
+       variables, OpenFOAM tags such as ``<constant>``).
+   * - ``centre``
+     - scalar
+     - ``0``
+     - Offset subtracted from the file offsets [lengthUnit] (e.g. the line
+       position when the file gives absolute wavelengths).
+   * - ``centreFirstMoment``
+     - bool
+     - ``false``
+     - Put the centroid of the linear density at zero instead.
+
+``width()`` returns the FWHM of the linear density (outermost half-maximum
+crossings).
+
+
+composite
+---------
+
+Class ``instrumentComposite``. Convolution of several instrument functions,
+e.g. the EAST SRF :math:`f_\mathrm{opt}\otimes f_\mathrm{cam}\otimes
+f_\mathrm{motion}`, tabulated once at start-up on a uniform grid.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``functions``
+     - dict
+     - (required)
+     - One sub-dictionary per component (any type, composite included); a
+       component inherits ``lengthUnit`` from the composite unless it sets
+       its own. Non-dictionary entries are ignored; at least one is needed.
+   * - ``resolution``
+     - scalar
+     - ``200``
+     - Table spacing :math:`h` = (smallest component width)/resolution.
+   * - ``maxNodes``
+     - label
+     - ``400001``
+     - Cap on the number of table nodes (a warning is printed when reached).
+
+``width()`` returns the smallest component width.
+
+.. code-block:: cpp
+
+   spatialResponse
+   {
+       type        composite;
+       lengthUnit  cm;
+       functions
+       {
+           optics  { type trapezoid; baseWidth 0.041; topWidth 0; }
+           camera  { type eastLineShape; form sqrtVoigt;
+                     halfWidthGauss 0.026; halfWidthLorentz 0.063; cutoff 10; }
+           motion  { type topHat; width 0.514; }
+       }
+   }
+
+
+eastLineShape
+-------------
+
+Class ``instrumentEastLineShape``. The two empirical EAST line shapes of
+Brandis and Cruden (2017, Sec. IV.A, App. C), parameterised by the half widths
+at half maximum of their tables.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``form``
+     - word
+     - (required)
+     - ``sqrtVoigt`` (ILS1) or ``gaussLorentz`` (ILS2).
+   * - ``halfWidthGauss``
+     - scalar
+     - (required)
+     - Gaussian HWHM :math:`w_G \ge 0` [lengthUnit].
+   * - ``halfWidthLorentz``
+     - scalar
+     - (required)
+     - Lorentzian HWHM :math:`w_L \ge 0` [lengthUnit]; not both zero.
+   * - ``ratio``
+     - scalar
+     - ``0``
+     - :math:`a \in [0, 1]`, weight of the Lorentzian (``gaussLorentz`` only).
+   * - ``cutoff``
+     - scalar
+     - (required)
+     - Half range :math:`R` [lengthUnit] of the normalisation (sqrt-Voigt)
+       or of the truncation (Gauss + Lorentz).
+   * - ``resolution``
+     - scalar
+     - ``100``
+     - Table nodes per Voigt FWHM (``sqrtVoigt`` only).
+
+``width()`` returns the Olivero-Longbothum FWHM of the Voigt of FWHM
+:math:`2w_G`, :math:`2w_L`.
+
+
+shockTubeInstrument
+-------------------
+
+Files: ``shockTubeInstrument/shockTubeInstrument.{H,C}``. Not run-time
+selected: one object per camera, constructed from the camera dictionary. It
+turns a radiance field :math:`I(x,\lambda)` [W m\ :sup:`-2` sr\ :sup:`-1`
+m\ :sup:`-1`] into what the instrument reports.
+
+.. list-table:: Keywords read by shockTubeInstrument
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``spectralResponse``
+     - dict
+     - absent (identity)
+     - ILS, any ``instrumentFunction``.
+   * - ``spatialResponse``
+     - dict
+     - absent (identity)
+     - SRF, any ``instrumentFunction`` (usually ``composite``).
+   * - ``bandUnit``
+     - word
+     - ``nm``
+     - Unit of the band bounds: ``nm``, ``um`` or ``m``.
+   * - ``bands``
+     - dict
+     - none
+     - Entries ``name (lambdaMin lambdaMax);`` with max > min.
+   * - ``shockFront/criterion``
+     - word
+     - ``peakRadiance``
+     - ``peakRadiance``, ``maxGradient`` or ``riseFraction``.
+   * - ``shockFront/fraction``
+     - scalar
+     - ``0.5``
+     - Rise fraction (``riseFraction``).
+   * - ``shockFront/upstreamSide``
+     - word
+     - ``low``
+     - ``low``: :math:`x` increases from the free stream into the shocked gas;
+       ``high``: the opposite. Any other word is a FatalIOError.
+   * - ``shockFront/preValue``, ``postValue``
+     - scalar
+     - end values
+     - Fixed pre- and post-shock levels (``riseFraction``).
+
+Main member functions: ``spectralConvolve``, ``spatialConvolve``,
+``measure(x, lambda, I)`` (ILS then SRF, in place), ``bandIntegral``
+(static, exact integral of the piecewise-linear spectrum), ``bandProfile``,
+``shockFront``, ``peakLocation``, ``maxGradientLocation``, ``riseLocation``
+(static), ``behindShock``; static constants ``toEASTSpectral`` = 1e-10 and
+``toEASTBand`` = 1e-4.
+
+Camera keywords read by shockTube1D
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In ``shockTube1DCoeffs/instrument`` every sub-dictionary is one camera, named
+by its keyword. Besides the keywords above, ``shockTube1D.C`` reads:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``window``
+     - word
+     - the only window
+     - Spectral window measured; required when there are several windows.
+   * - ``wavelengthRange``
+     - (a b)
+     - whole window
+     - Sub-range [nm] of the window; must hold at least two grid points.
+   * - ``shockFront/band``
+     - word
+     - first band
+     - Band whose measured profile locates the front.
+   * - ``shockFront/position``
+     - scalar
+     - (none)
+     - Fixed front position :math:`x_0` [distanceUnit], instead of a criterion.
+   * - ``distanceUnit``
+     - word
+     - ``m``
+     - ``m``, ``cm`` or ``mm``: unit of the distance column and of every
+       distance of the camera dictionary.
+   * - ``metricHalfWidth``
+     - scalar
+     - 0.02 m
+     - Half width :math:`h` of the nonequilibrium metric [distanceUnit];
+       absent: 0.02 m (EAST) whatever ``distanceUnit``.
+   * - ``spectra``
+     - dict
+     - none
+     - Sub-dictionaries with ``at d;`` or ``at peak;``, ``average (d1 d2);``
+       or ``metric h;`` [distanceUnit].
+   * - ``writeField``
+     - bool
+     - ``false``
+     - Write the whole measured field (binary, SI).
+   * - ``spatialBinWidth``
+     - scalar
+     - (none)
+     - Average the raw cells over uniform bins of this width
+       [distanceUnit] before the measurement.
+
+.. code-block:: cpp
+
+   instrument
+   {
+       UVVis
+       {
+           window          UVVis;
+           spectralResponse
+           {
+               type eastLineShape; lengthUnit nm; form sqrtVoigt;
+               halfWidthGauss 0.28; halfWidthLorentz 0.070; cutoff 10;
+           }
+           bands           { UVVis_EAST (328 477); }
+           shockFront      { criterion peakRadiance; band UVVis_EAST; }
+           distanceUnit    cm;
+           metricHalfWidth 2;
+           spectra
+           {
+               nonequilibrium  { at peak; }
+               equilibrium     { average (3 4.5); }
+           }
+       }
+   }
+
+
+Test-radiationInstrument
+------------------------
+
+Files: ``applications/test/radiationInstrument/Test-radiationInstrument.C``.
+A verification driver of ``instrumentFunction`` and ``shockTubeInstrument``.
+It reads the dictionary given by ``-dict`` (default
+``system/instrumentTests``); each sub-dictionary is one test, run in order,
+selected by ``kind``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 40 46
+
+   * - kind
+     - Entries
+     - Output
+   * - ``convolve``
+     - ``function {...}``, ``input`` (two columns: y [m], f), ``output``
+     - Two comment lines with the trapezoid integrals of f and g and their
+       relative change, then ``y,f,g``.
+   * - ``kernel``
+     - ``function {...}``, ``nodes (min max n)`` [m], ``output``
+     - ``s,pdf,cdf``.
+   * - ``band``
+     - ``input`` (lambda [m], I), ``bands { name (min max); }`` [nm],
+       ``output``
+     - ``band,lambdaMin,lambdaMax,integral`` (integral in the unit of I
+       :math:`\times` m).
+   * - ``front``
+     - ``input`` (x [m], f), ``output``
+     - ``criterion,x0`` for ``peakRadiance``, ``maxGradient`` (on
+       :math:`|{\rm d}f/{\rm d}x|`) and ``riseFraction`` (0.5, upstream low,
+       end values).
+   * - ``measure``
+     - ``instrument {...}`` (a ``shockTubeInstrument``), ``input`` (line 1:
+       nx nl; then nl wavelengths [m], nx positions [m], nx·nl values,
+       row-major in x), ``output``, ``bandOutput``
+     - The measured field in the input format, and ``x`` plus one column per
+       band; the front of the configured criterion on band 0 is printed in
+       the log.
+
+Note that the ``front`` kind calls ``maxGradientLocation`` with direction 0
+(the largest :math:`|{\rm d}f/{\rm d}x|`), whereas ``shockTube1D`` uses the
+signed slope of the configured ``upstreamSide``.
+
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of
+  Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences
+  Meeting, AIAA Paper 2017-1145, 2017. doi:10.2514/6.2017-1145
+* Olivero, J. J. and Longbothum, R. L., "Empirical fits to the Voigt line
+  width: A brief review," *Journal of Quantitative Spectroscopy and Radiative
+  Transfer*, 17 (2), 233-236, 1977. doi:10.1016/0022-4073(77)90161-3
+* Thompson, P., Cox, D. E. and Hastings, J. B., *Journal of Applied
+  Crystallography*, 20, 79, 1987 (reference as given in
+  ``instrumentVoigt.H``).

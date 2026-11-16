@@ -1,0 +1,1363 @@
+Input Reference
+===============
+
+The present page lists every keyword that radiationFoam and
+``libradiationFoam`` read, grouped by dictionary and model. The list was
+built from the parsers themselves (every ``get``, ``getOrDefault``,
+``readIfPresent``, ``found``, ``lookup``, ``subDict`` and ``findDict`` call
+in ``src/radiation`` and ``applications``), so it documents what the code
+reads, not an intended interface. "required" in the *Default* column means
+that a missing entry stops the run with a FatalIOError.
+
+Unless a row says otherwise, quantities are SI (m, m\ :sup:`-3`, K, kg,
+s). The exceptions are the spectral grid and band bounds (nm), the atomic
+ionisation energy (cm\ :sup:`-1`) and the lengths of the instrument
+dictionaries (``lengthUnit``, ``bandUnit``, ``distanceUnit``).
+
+The physics behind each keyword is explained in the
+:doc:`/theory/index`; the classes that read them in
+:doc:`/classes/index`.
+
+Overview
+--------
+
+Everything is read from ``system/radiationProperties``:
+
+.. code-block:: text
+
+   radiationProperties
+   ├── mode                          singleCell | shockTube1D
+   ├── populationModel               boltzmannTemperatures | cellDistribution
+   ├── <populationModel>Coeffs       optional
+   ├── continuum                     none | physical          (optional)
+   ├── species
+   │   └── <s>                       one per radiating species
+   │       ├── model, mass, radius
+   │       ├── <model>Coeffs         atomicLinesCoeffs | diatomicBandsCoeffs
+   │       ├── continuum             optional per-species override
+   │       └── continuumCoeffs       continuum physical only
+   ├── spectralGrid                  singleCell
+   ├── cellState                     singleCell
+   └── shockTube1DCoeffs             shockTube1D
+       ├── diameter, windows, bands, profile
+       ├── distribution              optional (cellDistribution)
+       ├── writeSpectra, writeCoefficients, writeDistributions
+       └── instrument                optional
+           └── <camera>
+               ├── window, wavelengthRange, bandUnit, bands
+               ├── spectralResponse, spatialResponse   (instrument functions)
+               ├── shockFront, distanceUnit, metricHalfWidth, spatialBinWidth
+               └── spectra, writeField
+
+Two other inputs are files with their own format: the level-distribution
+files (`Level-distribution file`_) and the macro file of a 1-D profile
+(`Macro file`_). The data files of the database (transition files,
+photoionisation files) are described in :doc:`/classes/database`.
+
+``system/controlDict`` is the standard OpenFOAM file (see
+:doc:`running`); radiationFoam reads no keyword of its own there.
+
+Top level of ``radiationProperties``
+------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``mode``
+     - word
+     - required
+     - Transport model: ``singleCell`` (coefficients of one cell, no
+       transfer) or ``shockTube1D`` (1-D profile, a slab of the tube
+       diameter per cell). Run-time selection.
+     - ``transport/basic/radiationTransportModel/radiationTransportModelNew.C``
+   * - ``populationModel``
+     - word
+     - required
+     - ``boltzmannTemperatures`` (Boltzmann re-expansion at the species
+       temperatures) or ``cellDistribution`` (level populations given per
+       cell). Run-time selection.
+     - ``populations/basic/radiationPopulationModel/radiationPopulationModelNew.C``
+   * - ``<populationModel>Coeffs``
+     - dict
+     - empty
+     - Coefficients of the population model (``subOrEmptyDict``):
+       ``boltzmannTemperaturesCoeffs`` has no entries;
+       ``cellDistributionCoeffs`` see `Population models`_.
+     - ``populations/basic/radiationPopulationModel/radiationPopulationModel.C``
+   * - ``continuum``
+     - word
+     - ``none``
+     - Continuum of every atomic species: ``none`` or ``physical``
+       (bound-free and free-free). Overridden per species. See
+       `Continuum`_.
+     - ``continuum/continuumProcesses/continuumProcesses.C``
+   * - ``species``
+     - dict
+     - required
+     - One sub-dictionary per radiating species, keyword = species name.
+       The species of the case are the keys of this dictionary, in their
+       order.
+     - ``applications/solvers/radiationFoam/radiationFoam.C``
+   * - ``spectralGrid``
+     - dict
+     - required (singleCell)
+     - Wavelength grid of ``singleCell``. See `spectralGrid`_.
+     - ``transport/derived/singleCell/singleCell.C``
+   * - ``cellState``
+     - dict
+     - required (singleCell)
+     - The state of the cell of ``singleCell``. See `cellState`_.
+     - ``transport/derived/singleCell/singleCell.C``
+   * - ``shockTube1DCoeffs``
+     - dict
+     - required (shockTube1D)
+     - Everything of the ``shockTube1D`` mode. See `shockTube1DCoeffs`_.
+     - ``transport/derived/shockTube1D/shockTube1D.C``
+
+Radiating species
+-----------------
+
+Common entries: ``species/<s>``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Read by the base class ``radiatingSpecies``
+(``radiators/basic/radiatingSpecies/radiatingSpecies.C`` and
+``radiatingSpeciesNew.C``) for every species.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``model``
+     - word
+     - required
+     - Radiator class: ``atomicLines`` (atoms and atomic ions) or
+       ``diatomicBands`` (diatomic molecules and ions).
+     - ``radiatingSpeciesNew.C``
+   * - ``mass``
+     - scalar [kg]
+     - required
+     - Particle mass: Doppler width and the mass density of the
+       perturbers.
+     - ``radiatingSpecies.C``
+   * - ``radius``
+     - scalar [m]
+     - required
+     - Hard-sphere radius, used in the phase-interrupting (collision)
+       broadening of the atomic lines, both for the radiator and for every
+       radiating species of the cell as a perturber,
+       :math:`\nu_\mathrm{coll}\propto\sum_j n_j\pi(r+r_j)^2`. Read for every
+       species; the lines of ``diatomicBands`` do not use it (the tutorials
+       give 0 for N2).
+     - ``radiatingSpecies.C``
+   * - ``<model>Coeffs``
+     - dict
+     - required
+     - ``atomicLinesCoeffs`` or ``diatomicBandsCoeffs`` (``subDict``, so
+       required even when the class reads few entries).
+     - ``radiatingSpecies.C``
+   * - ``continuum``
+     - word
+     - top-level ``continuum``
+     - Per-species override of the continuum: ``none`` or ``physical``.
+       Given on a species whose model is not ``atomicLines`` with a value
+       other than ``none``: FatalIOError.
+     - ``continuumProcesses.C``
+   * - ``continuumCoeffs``
+     - dict
+     - empty
+     - Continuum coefficients (`Continuum`_).
+     - ``continuumModel.C``
+
+``atomicLinesCoeffs``
+~~~~~~~~~~~~~~~~~~~~~
+
+Bound-bound lines of an atom or atomic ion
+(``radiators/derived/atomicLines/atomicLines.C``; theory in
+:doc:`/theory/atomic_lines`).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``transitionFile``
+     - fileName
+     - required
+     - Atomic transition file of the database (levels and lines), e.g.
+       ``"$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat"``.
+       Environment variables and ``<case>`` are expanded; the path is
+       opened as written.
+     - ``atomicLines.C``
+   * - ``ionisationEnergy``
+     - scalar [cm\ :sup:`-1`]
+     - required
+     - Ionisation limit of the species, converted to J by
+       :math:`hc\times 100`. Upper bound of the bound levels, lowered by
+       the Debye-Hückel term. The tutorials use the NIST ASD v5.12 values
+       (N I 117225.7, O I 109837.02).
+     - ``atomicLines.C``
+   * - ``starkExponent``
+     - scalar [-]
+     - required
+     - Exponent :math:`n` of the electron-temperature dependence of the
+       Stark width,
+       :math:`\Delta\lambda_S=\Delta\lambda_{S,0}(T_e/10^4\,\mathrm{K})^n
+       (n_e/10^{22}\,\mathrm{m^{-3}})`. The tutorials use 0.33 (1/3,
+       Johnston 2006, Eq. 3.13).
+     - ``atomicLines.C``
+   * - ``lineShape``
+     - word
+     - required
+     - Line-shape model, run-time selected. Only
+       ``voigtWhitingOliveroLongbothum`` exists (Voigt width of Liu et
+       al. 2001, Whiting 1968 shape, integrated per bin). The model
+       reads no other entry.
+     - ``lineShapes/basic/lineShapeModel/lineShapeModelNew.C``
+
+``diatomicBandsCoeffs``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Bound-bound band systems of a diatomic, line by line
+(``radiators/derived/diatomicBands/diatomicBands.C``; theory in
+:doc:`/theory/diatomic_bands`).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``transitionFile``
+     - fileName
+     - required
+     - Molecule file of the database (electronic states, band systems,
+       transition tables), e.g.
+       ``"$RADIATIONFOAM_DIR/src/radiation/database/molecules/N2.dat"``.
+       Every band system not commented out in the file is computed (no
+       band selection keyword).
+     - ``diatomicBands.C``
+
+Population models
+-----------------
+
+``boltzmannTemperatures`` reads no entry
+(``populations/derived/boltzmannTemperatures``). It needs, per species,
+the electronic temperature, and for diatomics the vibrational and
+rotational temperatures, from the cell state.
+
+``cellDistributionCoeffs`` (all optional,
+``populations/derived/cellDistribution/cellDistribution.C``; theory in
+:doc:`/theory/populations`):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``missingLevels``
+     - word
+     - ``zero``
+     - Levels of the spectroscopic data covered by no entry of the
+       distribution: ``zero`` (population 0, reported in the log) or
+       ``boltzmannFill`` (Boltzmann population at the species electronic
+       temperature of the cell state; levels the DSMC ladder carries but
+       that received no parcel keep 0 when the file has a ``coverage``
+       entry). Any other value: FatalIOError.
+     - ``cellDistribution.C``
+   * - ``fillReport``
+     - fileName
+     - ``"<case>/postProcessing/radiationFoam/cellDistributionFill.csv"``
+     - CSV file of the ``boltzmannFill`` diagnostics: one row per call
+       (cell, species, window), with the filled share of the emission.
+       Expanded; relative to the case.
+     - ``cellDistribution.C``
+
+The level populations of ``cellDistribution`` come from the cell state:
+``cellState/distributionFile`` (``singleCell``) or
+``shockTube1DCoeffs/distribution`` (``shockTube1D``).
+
+Continuum
+---------
+
+The continuum is built by ``continuumProcesses``
+(``continuum/continuumProcesses/continuumProcesses.C``). With
+``physical``, for every species of model ``atomicLines``:
+
+* a ``boundFreePhysical`` process if ``continuumCoeffs`` gives
+  ``ionSpecies`` (else none, reported in the log);
+* a ``freeFreePhysical`` process if ``chargeNumber`` :math:`\geq 1`.
+
+Species of another model are skipped by the global entry. Theory in
+:doc:`/theory/continuum`.
+
+``continuumCoeffs`` (in ``species/<s>``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``chargeNumber``
+     - label
+     - required (continuum physical)
+     - Charge of the species: 0 for N, O; 1 for N+, O+.
+     - ``continuumProcesses.C``, ``continuumModel.C``
+   * - ``ionSpecies``
+     - word
+     - none
+     - The radiating species one charge higher (the recombining ion of the
+       bound-free process). Must be a species of the case and not the
+       species itself (FatalIOError).
+     - ``continuumModel.C``
+   * - ``crossSection``
+     - word
+     - required (bound-free)
+     - Photoionisation cross sections: ``hydrogenic`` (Kramers, with the
+       Gaunt factor below) or ``tabulated`` (file below).
+     - ``continuum/derived/boundFreePhysical/boundFreePhysical.C``
+   * - ``photoionisationFile``
+     - fileName
+     - required (``tabulated``)
+     - Photoionisation file of the database, e.g.
+       ``"$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I_photoionisation.dat"``
+       (one row per level of the transition file).
+     - ``boundFreePhysical.C``
+   * - ``gauntFactor``
+     - scalar
+     - 1
+     - Gaunt factor of the hydrogenic bound-free cross section.
+     - ``boundFreePhysical.C``
+   * - ``gauntFreeFree``
+     - scalar
+     - 1
+     - Free-free Gaunt factor (1: Kramers).
+     - ``continuum/derived/freeFreePhysical/freeFreePhysical.C``
+
+Example (atomic nitrogen with its ion):
+
+.. code-block:: c++
+
+   continuum       physical;
+
+   species
+   {
+       N
+       {
+           model           atomicLines;
+           ...
+           continuumCoeffs
+           {
+               chargeNumber        0;
+               ionSpecies          N+;
+               crossSection        tabulated;
+               photoionisationFile "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I_photoionisation.dat";
+           }
+       }
+       N+
+       {
+           model           atomicLines;
+           ...
+           continuumCoeffs { chargeNumber 1; }
+       }
+   }
+
+Mode ``singleCell``
+-------------------
+
+``transport/derived/singleCell/singleCell.C``: one cell, the emission and
+absorption coefficients on one grid, no transfer, no mesh.
+
+``spectralGrid``
+~~~~~~~~~~~~~~~~
+
+Also the format of every window of ``shockTube1DCoeffs/windows``
+(``common/spectralGrid/spectralGrid.C``). The grid is uniform:
+:math:`\lambda_i=\lambda_\mathrm{min}+i\,\Delta\lambda`,
+:math:`\Delta\lambda=(\lambda_\mathrm{max}-\lambda_\mathrm{min})/(N-1)`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``minWavelength``
+     - scalar [nm]
+     - required
+     - :math:`\lambda_\mathrm{min}` (vacuum wavelength).
+     - ``spectralGrid.C``
+   * - ``maxWavelength``
+     - scalar [nm]
+     - required
+     - :math:`\lambda_\mathrm{max}`; must exceed ``minWavelength``.
+     - ``spectralGrid.C``
+   * - ``nPoints``
+     - label
+     - required
+     - Number of grid points :math:`N`, at least 100 (FatalIOError
+       below).
+     - ``spectralGrid.C``
+
+``cellState``
+~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``electronNumberDensity``
+     - scalar [m\ :sup:`-3`]
+     - required
+     - :math:`n_e` of the cell (Stark width, Debye-Hückel lowering,
+       continuum).
+     - ``singleCell.C``
+   * - ``electronTemperature``
+     - scalar [K]
+     - required
+     - :math:`T_e` of the cell. :math:`T_e\leq 0`: the line widths use the
+       temperature of the population model instead; no continuum.
+     - ``singleCell.C``
+   * - ``distributionFile``
+     - fileName
+     - none
+     - Level-distribution file of the cell (`Level-distribution file`_),
+       read when given; needed by ``populationModel cellDistribution``.
+       Expanded; relative to the case.
+     - ``singleCell.C``
+   * - ``species``
+     - dict
+     - required
+     - One sub-dictionary per radiating species (all species of
+       ``species`` must appear).
+     - ``singleCell.C``
+
+``cellState/species/<s>``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``numberDensity``
+     - scalar [m\ :sup:`-3`]
+     - required
+     - Number density of the species.
+     - ``singleCell.C``
+   * - ``translationalTemperature``
+     - scalar [K]
+     - required
+     - Translational temperature (Doppler and pressure widths).
+     - ``singleCell.C``
+   * - ``electronicTemperature``
+     - scalar [K]
+     - 0 (warning)
+     - Electronic temperature of the Boltzmann re-expansion. Absent: 0,
+       i.e. no electronic excitation (the species in its lowest
+       electronic level(s)); a warning is printed.
+     - ``singleCell.C``
+   * - ``vibrationalTemperature``
+     - scalar [K]
+     - 0
+     - Diatomics: temperature of the vibrational factor of the Boltzmann
+       re-expansion. No population below 10 K (warning).
+     - ``singleCell.C``
+   * - ``rotationalTemperature``
+     - scalar [K]
+     - 0
+     - Diatomics: temperature of the rotational factor. Must be positive
+       for a diatomic with ``boltzmannTemperatures``.
+     - ``singleCell.C``
+
+Example (``tutorials/singleCell_N``):
+
+.. code-block:: c++
+
+   mode            singleCell;
+   populationModel boltzmannTemperatures;
+
+   spectralGrid
+   {
+       minWavelength       867.9;     // [nm]
+       maxWavelength       869.2;     // [nm]
+       nPoints             1000;
+   }
+
+   cellState
+   {
+       electronNumberDensity   1e21;           // [m^-3]
+       electronTemperature     10000;          // [K]
+
+       species
+       {
+           N
+           {
+               numberDensity               1e21;   // [m^-3]
+               translationalTemperature    20000;  // [K]
+               electronicTemperature       10000;  // [K]
+           }
+       }
+   }
+
+Level-distribution file
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Read by ``radiationCellState::readDistribution``
+(``common/radiationCellState/radiationCellState.C``), for
+``cellState/distributionFile`` and for every ``cell<k>`` file of
+``shockTube1DCoeffs/distribution``. It is an OpenFOAM dictionary, the
+format written by the dsmcFoam function object
+``dsmcRadiationDistribution`` (:doc:`dsmcfoam_coupling`):
+
+.. code-block:: c++
+
+   cell    12;                     // optional, -1 if absent (fill report)
+   N
+   {
+       levels
+       (
+           (1)        9.6e20       // atom: one level label of the transition file
+           (6 7 8)    3.1e15       // atom: a group of level labels
+       );
+       g        ( 4 36 );          // optional: DSMC level weight per entry
+       coverage complete;          // optional: every carried level is an entry
+   }
+   N2
+   {
+       levels
+       (
+           (X 0 12)   1.2e18       // diatomic: (electronic state, v, J)
+           ("B'" 1 3) 4.0e12       // quoted when not a valid word
+       );
+       coverage ( (X 0 0 98) (X 1 0 97) );   // optional: runs (state v J0 J1) carried
+   }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``cell``
+     - label
+     - -1
+     - Cell index, copied to the fill report.
+     - ``radiationCellState.C``
+   * - ``<s>``
+     - dict
+     - none
+     - One sub-dictionary per species. A species absent from the file has
+       no distribution (fatal for ``cellDistribution``); an empty
+       ``levels ( );`` is a distribution with no populated level.
+     - ``radiationCellState.C``
+   * - ``<s>/levels``
+     - list
+     - required in ``<s>``
+     - Entries ``(identifiers) numberDensity`` [m\ :sup:`-3`].
+       Identifiers are words, integers or quoted strings. Atom: level
+       labels; diatomic: exactly (state, v, J).
+     - ``radiationCellState.C``
+   * - ``<s>/g``
+     - scalarList
+     - none
+     - Statistical weight of the DSMC level of each entry; must have the
+       length of ``levels`` (FatalIOError otherwise).
+     - ``radiationCellState.C``
+   * - ``<s>/coverage``
+     - ``complete`` or list
+     - none
+     - Which DSMC levels the averaging block carried: ``complete``
+       (atoms) or runs ``(state v J0 J1)`` (diatomics). Used by
+       ``missingLevels boltzmannFill``.
+     - ``radiationCellState.C``
+
+The other entries written by ``dsmcRadiationDistribution``
+(``centre``, ``volume``, ``averagingTime``, ``nSamples``,
+``numberDensity``, ``parcelSamples``, ``parcelCounts``, ``energy``) are
+not read.
+
+Mode ``shockTube1D``
+--------------------
+
+``transport/derived/shockTube1D/shockTube1D.C``: the cells of a 1-D
+profile, each an independent uniform slab of thickness :math:`D` (the tube
+diameter), with radiance
+:math:`I_\lambda=-(j_\lambda/\kappa_\lambda)\,\mathrm{expm1}(-\kappa_\lambda D)`
+(:math:`j_\lambda D` when :math:`\kappa_\lambda=0`). Theory in
+:doc:`/theory/transport`.
+
+``shockTube1DCoeffs``
+~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``diameter``
+     - scalar [m]
+     - required
+     - Slab thickness :math:`D`, the tube diameter (EAST: 0.1016).
+     - ``shockTube1D.C``
+   * - ``windows``
+     - dict
+     - required
+     - One sub-dictionary per spectral window, keyword = window name,
+       each a `spectralGrid`_ (``minWavelength``, ``maxWavelength``,
+       ``nPoints``).
+     - ``shockTube1D.C``
+   * - ``bands``
+     - dict
+     - required
+     - Raw band integrals: ``name (a b);`` with :math:`a<b` in nm. A band
+       must lie inside one window (FatalIOError otherwise); a grid point on
+       a band edge is inside the band. May be empty (``bands { }``).
+     - ``shockTube1D.C``
+   * - ``profile``
+     - dict
+     - required
+     - The cell states (`profile`_).
+     - ``profiles/shockTubeProfile/shockTubeProfile.C``
+   * - ``distribution``
+     - dict
+     - none
+     - Level distributions of the cells (`distribution`_), for
+       ``populationModel cellDistribution``. When given, only the cells
+       listed in its ``cells`` file are computed.
+     - ``shockTube1D.C``
+   * - ``writeSpectra``
+     - ``all`` / ``none`` / labelList
+     - ``all``
+     - Cells whose radiance spectra are written
+       (``spectra_<window>.bin``); a list gives cell indices k.
+     - ``shockTube1D.C``
+   * - ``writeCoefficients``
+     - bool
+     - ``false``
+     - Also write :math:`j_\lambda` and :math:`\kappa_\lambda` of the
+       ``writeSpectra`` cells (``emission_<window>.bin``,
+       ``absorption_<window>.bin``).
+     - ``shockTube1D.C``
+   * - ``writeDistributions``
+     - ``all`` / ``none`` / labelList
+     - ``none``
+     - Cells whose level populations are written to
+       ``distribution/cell<k>`` in the ``dsmcRadiationDistribution``
+       format (17 digits), so that a Boltzmann profile can be replayed
+       through ``cellDistribution``.
+     - ``shockTube1D.C``
+   * - ``instrument``
+     - dict
+     - none
+     - EAST measurement model: one sub-dictionary per camera
+       (`instrument cameras`_). Entries that are not dictionaries are
+       ignored.
+     - ``shockTube1D.C``
+
+Cell numbering k: the profile cells sorted by x (0 to N-1), or the index k
+of the distribution files when ``distribution`` is given.
+
+``profile``
+~~~~~~~~~~~
+
+``profiles/shockTubeProfile/shockTubeProfile.C``. The cells are sorted by
+increasing x after reading; negative values of any field are set to 0.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``source``
+     - word
+     - required
+     - ``macroFile`` or ``dsmcCase``.
+     - ``shockTubeProfile.C``
+   * - ``file``
+     - fileName
+     - required (macroFile)
+     - The macro file (`Macro file`_). Expanded; relative to the case
+       directory when not absolute.
+     - ``shockTubeProfile.C``
+   * - ``electronNumberDensity``
+     - scalar [m\ :sup:`-3`]
+     - required if no ``n_e`` column
+     - :math:`n_e` of every cell (macroFile).
+     - ``shockTubeProfile.C``
+   * - ``electronTemperature``
+     - scalar [K]
+     - required if no ``T_e`` column
+     - :math:`T_e` of every cell (macroFile).
+     - ``shockTubeProfile.C``
+   * - ``case``
+     - fileName
+     - required (dsmcCase)
+     - Directory of a reconstructed dsmcFoam case. Expanded; relative to
+       the radiation case when not absolute.
+     - ``shockTubeProfile.C``
+   * - ``time``
+     - ``latestTime`` or scalar
+     - required (dsmcCase)
+     - Time directory read. A decomposed run not reconstructed (later time
+       in ``processor0``) or a time present only in ``processor0``:
+       FatalIOError.
+     - ``shockTubeProfile.C``
+   * - ``direction``
+     - word
+     - ``x``
+     - Component of the cell centre used as the position along the tube:
+       ``x``, ``y`` or ``z`` (dsmcCase).
+     - ``shockTubeProfile.C``
+   * - ``species``
+     - dict
+     - required (dsmcCase)
+     - Field names per species (below); an absent species, or an empty
+       sub-dictionary, uses the defaults.
+     - ``shockTubeProfile.C``
+   * - ``electrons``
+     - dict
+     - required (dsmcCase)
+     - ``numberDensity`` and ``temperature``: each a field name of the
+       dsmcFoam case or a number (uniform value).
+     - ``shockTubeProfile.C``
+
+``profile/species/<s>`` (dsmcCase): names of the ``volScalarField`` read
+for each quantity. The defaults are the names written by ``dsmcVolFields``;
+dsmcFoam writes one internal temperature per species (the temperature
+whose Boltzmann distribution over the rovibronic ladder has the sampled
+mean internal energy), so the three internal temperatures default to the
+same field.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 40
+
+   * - Keyword
+     - Default field
+     - Quantity
+   * - ``numberDensity``
+     - ``rhoN_<s>``
+     - number density [m\ :sup:`-3`]
+   * - ``translationalTemperature``
+     - ``translationalT_<s>``
+     - translational temperature [K]
+   * - ``rotationalTemperature``
+     - ``internalT_<s>``
+     - temperature of the rotational factor of the re-expansion [K]
+   * - ``vibrationalTemperature``
+     - ``internalT_<s>``
+     - temperature of the vibrational factor of the re-expansion [K]
+   * - ``electronicTemperature``
+     - ``internalT_<s>``
+     - temperature of the electronic factor of the re-expansion [K]
+
+Example (``tutorials/shockTube1D/fromDsmcCase``):
+
+.. code-block:: text
+
+   profile
+   {
+       source      dsmcCase;
+       case        "../dsmcCase";
+       time        latestTime;
+       direction   x;
+       species
+       {
+           N2 { rotationalTemperature translationalT_N2; }
+           N  { }
+           O  { }
+       }
+       electrons
+       {
+           numberDensity   1e+21;      // [m^-3] or a field name
+           temperature     10000;      // [K] or a field name
+       }
+   }
+
+Macro file
+~~~~~~~~~~
+
+A comma-separated text file, one row per cell; lines starting with ``#``
+are comments; the first other line names the columns, in any order:
+
+.. code-block:: text
+
+   # synthetic post-shock profile (x [m]; n [m^-3], T [K])
+   x,n_e,T_e,n_N2,Ttrans_N2,Telec_N2,Trot_N2,Tvib_N2,n_N,Ttrans_N,Telec_N
+   -0.00345,1e+21,10000.0,2.56e+21,300.0,300.0,300.0,300.0,1e15,300.0,300.0
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Column
+     - Required
+     - Meaning
+   * - ``x``
+     - yes
+     - position along the tube [m]
+   * - ``n_e``, ``T_e``
+     - no
+     - electrons; else ``electronNumberDensity``/``electronTemperature``
+       of ``profile``
+   * - ``n_<s>``, ``Ttrans_<s>``
+     - yes, per species
+     - number density [m\ :sup:`-3`], translational temperature [K]
+   * - ``Trot_<s>``, ``Tvib_<s>``, ``Telec_<s>``
+     - no
+     - 0 when absent; a missing ``Telec_<s>`` is reported (no electronic
+       excitation)
+
+A row with another number of values than the header is a FatalIOError.
+
+``distribution``
+~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``directory``
+     - fileName
+     - required
+     - A ``dsmcRadiationDistribution`` output directory,
+       ``.../postProcessing/dsmcRadiationDistribution/<name>/<time>``,
+       holding ``cells`` and ``cell<k>``. Expanded; relative to the case
+       directory when not absolute.
+     - ``shockTube1D.C``
+   * - ``direction``
+     - word
+     - ``x``
+     - Component of the cell centres of the ``cells`` file matched to the
+       profile positions: ``x``, ``y`` or ``z``.
+     - ``shockTube1D.C``
+   * - ``matchTolerance``
+     - scalar [-]
+     - 1e-3
+     - Each distribution cell is matched to the nearest profile cell; the
+       distance must be below ``matchTolerance`` times the smallest
+       profile cell spacing (FatalIOError otherwise).
+     - ``shockTube1D.C``
+
+The ``cells`` file is read line by line (``#`` comments skipped): cell
+index k, then the centre ``x y z``; further columns are ignored. An empty
+list is a FatalIOError.
+
+Instrument cameras
+~~~~~~~~~~~~~~~~~~
+
+``shockTube1DCoeffs/instrument/<camera>``: the EAST measurement model of
+one camera, applied to the raw radiance field :math:`I(x,\lambda)` of the
+cells sorted by x. The entries are read partly by ``shockTube1D``
+(``shockTube1D.C``) and partly by ``shockTubeInstrument``
+(``instrument/shockTubeInstrument/shockTubeInstrument.C``). Theory in
+:doc:`/theory/instrument`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``window``
+     - word
+     - the only window
+     - Window measured by the camera; required when there is more than
+       one window.
+     - ``shockTube1D.C``
+   * - ``wavelengthRange``
+     - (a b) [nm]
+     - whole window
+     - Sub-range of the window; must hold at least two grid points.
+     - ``shockTube1D.C``
+   * - ``spectralResponse``
+     - dict
+     - identity
+     - Instrument line shape (ILS): an `instrument function`_, convolution
+       in wavelength.
+     - ``shockTubeInstrument.C``
+   * - ``spatialResponse``
+     - dict
+     - identity
+     - Spatial resolution function (SRF): an instrument function,
+       convolution in x (use ``composite`` for optics, camera and shock
+       motion).
+     - ``shockTubeInstrument.C``
+   * - ``bandUnit``
+     - word
+     - ``nm``
+     - Unit of the camera bands: ``m``, ``um`` or ``nm``.
+     - ``shockTubeInstrument.C``
+   * - ``bands``
+     - dict
+     - none
+     - Measured bands ``name (min max);`` [bandUnit], max > min.
+     - ``shockTubeInstrument.C``
+   * - ``shockFront``
+     - dict
+     - empty
+     - Shock-front criterion (`shockFront`_).
+     - both
+   * - ``distanceUnit``
+     - word
+     - ``m``
+     - Unit of the distances of this camera (``position``,
+       ``metricHalfWidth``, ``spatialBinWidth``, ``spectra``): ``m``,
+       ``cm`` or ``mm``.
+     - ``shockTube1D.C``
+   * - ``metricHalfWidth``
+     - scalar [distanceUnit]
+     - 0.02 m
+     - Half width :math:`h` of the nonequilibrium metric
+       :math:`(1/D)\int_{x_0-h}^{x_0+h}(\cdot)\,dx`, in ``distanceUnit``.
+       Absent: 2 cm (0.02 m, the EAST definition) whatever
+       ``distanceUnit``. The interval is clipped to the profile
+       (warning).
+     - ``shockTube1D.C``
+   * - ``spatialBinWidth``
+     - scalar [distanceUnit]
+     - none
+     - Optional uniform x bins: the raw radiance is averaged over bins of
+       this width (weighted by the cell widths) before the measurement.
+       Must be positive.
+     - ``shockTube1D.C``
+   * - ``spectra``
+     - dict
+     - none
+     - Measured spectra (`spectra`_).
+     - ``shockTube1D.C``
+   * - ``writeField``
+     - bool
+     - ``false``
+     - Write the whole measured field
+       (``instrument_<camera>_field.bin`` and ``.info``).
+     - ``shockTube1D.C``
+
+shockFront
+^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``criterion``
+     - word
+     - ``peakRadiance``
+     - ``peakRadiance`` (parabola-refined maximum), ``maxGradient``
+       (steepest rise from the upstream side) or ``riseFraction``. Any
+       other value: FatalIOError.
+     - ``shockTubeInstrument.C``
+   * - ``band``
+     - word
+     - first camera band
+     - Camera band whose measured profile locates the front; must be one
+       of ``bands``.
+     - ``shockTube1D.C``
+   * - ``position``
+     - scalar [distanceUnit]
+     - none
+     - Fixed front position :math:`x_0` instead of a criterion. Without
+       it, the camera needs at least one band.
+     - ``shockTube1D.C``
+   * - ``upstreamSide``
+     - word
+     - ``low``
+     - ``low``: x increases from the free stream into the shocked gas;
+       ``high``: the opposite; any other word is a FatalIOError. Sets the
+       sign of the distance behind the shock.
+     - both
+   * - ``fraction``
+     - scalar
+     - 0.5
+     - ``riseFraction``: the front is where the profile crosses
+       :math:`f_\mathrm{pre}+\mathrm{fraction}\,(f_\mathrm{post}-f_\mathrm{pre})`.
+     - ``shockTubeInstrument.C``
+   * - ``preValue``, ``postValue``
+     - scalar
+     - end values
+     - ``riseFraction``: fixed pre- and post-shock values instead of the
+       profile end values.
+     - ``shockTubeInstrument.C``
+
+spectra
+^^^^^^^
+
+Each sub-dictionary of ``spectra`` is one measured spectrum, a column of
+``instrument_<camera>_spectra.csv`` [W cm\ :sup:`-2` sr\ :sup:`-1`
+µm\ :sup:`-1`]. Exactly one of:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Entry
+     - Type
+     - Spectrum
+   * - ``at``
+     - ``peak`` or scalar [distanceUnit]
+     - At a distance d behind the front (linear interpolation in x between
+       cells), or at the parabola-refined peak of the front band (needs a
+       front band).
+   * - ``average``
+     - (d1 d2) [distanceUnit]
+     - Mean over the distances d1 to d2 behind the front.
+   * - ``metric``
+     - scalar h [distanceUnit]
+     - Spectral nonequilibrium metric
+       :math:`(1/D)\int_{x_0-h}^{x_0+h}I\,dx`.
+
+A requested position outside the profile is a FatalIOError (for
+``average`` and ``metric`` a partly outside range is clipped with a
+warning). A sub-dictionary with none of the three is a FatalIOError.
+
+Example (one camera of ``tutorials/EAST/east5029``):
+
+.. code-block:: c++
+
+   instrument
+   {
+       VUV
+       {
+           window          VUV;
+           spectralResponse
+           {
+               type            eastLineShape;
+               lengthUnit      nm;
+               form            sqrtVoigt;
+               halfWidthGauss  0.084;
+               halfWidthLorentz 0.0025;
+               cutoff          10;
+           }
+           spatialResponse
+           {
+               type            composite;
+               lengthUnit      cm;
+               functions
+               {
+                   optics  { type trapezoid; baseWidth 0.041; topWidth 0; }
+                   camera  { type eastLineShape; form sqrtVoigt;
+                             halfWidthGauss 0.026; halfWidthLorentz 0.063; cutoff 10; }
+                   motion  { type topHat; width 0.514; }
+               }
+           }
+           bandUnit        nm;
+           bands           { VUV_EAST (162 218); }
+           shockFront      { criterion peakRadiance; band VUV_EAST; upstreamSide low; }
+           distanceUnit    cm;
+           metricHalfWidth 2;
+           spatialBinWidth 0.005;
+           spectra
+           {
+               nonequilibrium  { at peak; }
+               metric          { metric 2; }
+               equilibrium     { average (3 4.5); }
+           }
+       }
+   }
+
+Instrument function
+~~~~~~~~~~~~~~~~~~~
+
+Every ``spectralResponse``, ``spatialResponse``, every member of a
+``composite`` and every ``function`` of the test application is an
+``instrumentFunction``, run-time selected by ``type``
+(``instrument/instrumentFunctions``). The coefficients sit directly in the
+dictionary (no ``Coeffs`` sub-dictionary). Entries of the base class
+(``basic/instrumentFunction/instrumentFunction.C``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 14 38 16
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+     - Source
+   * - ``type``
+     - word
+     - required
+     - ``gaussian``, ``topHat``, ``trapezoid``, ``voigt``,
+       ``eastLineShape``, ``tabulated`` or ``composite``.
+     - ``instrumentFunctionNew.C``
+   * - ``lengthUnit``
+     - word
+     - ``m``
+     - Unit of every width of the function: ``m``, ``cm``, ``mm``, ``um``
+       or ``nm``.
+     - ``instrumentFunction.C``
+   * - ``conserveAtEdges``
+     - bool
+     - ``true``
+     - ``true``: the part of a kernel that falls outside the window is
+       given back to the window, so the trapezoid integral is conserved to
+       round-off. ``false``: it is lost, as on a detector of finite size.
+     - ``instrumentFunction.C``
+
+Coefficients of each type (lengths in ``lengthUnit``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 22 14 48
+
+   * - type
+     - Keyword
+     - Default
+     - Meaning
+   * - ``gaussian``
+     - ``fwhm`` or ``sigma``
+     - one required
+     - Full width at half maximum, or the standard deviation (``sigma``
+       wins if both are given); must be positive.
+   * -
+     - ``cutoff``
+     - 10
+     - Kernel cut at :math:`|s|=\mathrm{cutoff}\,\sigma`.
+   * - ``topHat``
+     - ``width``
+     - see next
+     - Full width :math:`w`.
+   * -
+     - ``shockSpeed``, ``gateTime``
+     - required without ``width``
+     - :math:`w=U_s t_\mathrm{gate}` [m s\ :sup:`-1`] × [s], always SI
+       (smear of the shock during the camera gate).
+   * - ``trapezoid``
+     - ``baseWidth``
+     - required
+     - Bottom width :math:`b`.
+   * -
+     - ``topWidth``
+     - 0
+     - Top width :math:`t`, :math:`0\le t\le b` (0: triangle).
+   * - ``voigt``
+     - ``fwhmGauss``, ``fwhmLorentz``
+     - required
+     - FWHM of the Gaussian and Lorentzian parts (0 gives the other pure
+       profile).
+   * -
+     - ``form``
+     - ``exact``
+     - ``exact`` (tabulated convolution) or ``pseudoVoigt`` (Thompson, Cox
+       and Hastings 1987).
+   * -
+     - ``cutoff``
+     - 100
+     - Wings cut at :math:`|s|=\mathrm{cutoff}\,f_V` (:math:`f_V` the
+       Olivero-Longbothum width).
+   * -
+     - ``resolution``
+     - 100
+     - Table nodes per :math:`f_V` (``exact``).
+   * - ``eastLineShape``
+     - ``form``
+     - required
+     - ``sqrtVoigt`` (ILS1 of Brandis and Cruden 2017) or
+       ``gaussLorentz`` (ILS2).
+   * -
+     - ``halfWidthGauss``, ``halfWidthLorentz``
+     - required
+     - Half widths at half maximum :math:`w_g`, :math:`w_l` (both
+       :math:`\ge 0`, not both zero).
+   * -
+     - ``cutoff``
+     - required
+     - Half range :math:`R` of the normalisation, a length (the
+       ``sqrtVoigt`` wings decay as :math:`1/|s|`, so the result depends on
+       it); must be positive.
+   * -
+     - ``ratio``
+     - 0
+     - :math:`a\in[0,1]` of ``gaussLorentz``.
+   * -
+     - ``resolution``
+     - 100
+     - Table nodes per Voigt FWHM (``sqrtVoigt``).
+   * - ``tabulated``
+     - ``file``
+     - required
+     - Two-column ASCII file: offset (in ``lengthUnit``) and response
+       (:math:`\ge 0`, any scale); ``#`` comments. Expanded; relative to
+       the case (the working directory for Test-radiationInstrument).
+   * -
+     - ``centre``
+     - 0
+     - Offset subtracted from the file offsets.
+   * -
+     - ``centreFirstMoment``
+     - ``false``
+     - Put the centroid at 0 instead of using ``centre``.
+   * - ``composite``
+     - ``functions``
+     - required
+     - Sub-dictionaries, each an instrument function (any type, composite
+       included); they inherit ``lengthUnit`` unless they set their own.
+   * -
+     - ``resolution``
+     - 200
+     - Table step :math:`h` = smallest component width / resolution.
+   * -
+     - ``maxNodes``
+     - 400001
+     - Cap on the number of table nodes.
+
+Test application dictionary
+---------------------------
+
+``Test-radiationInstrument``
+(``applications/test/radiationInstrument/Test-radiationInstrument.C``)
+reads the dictionary named by ``-dict`` (default
+``system/instrumentTests``). Every sub-dictionary except ``FoamFile`` is a
+test, run in order:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 40 46
+
+   * - ``kind``
+     - Entries
+     - Output
+   * - ``convolve``
+     - ``function {...}``, ``input`` (two columns: y [m], f), ``output``
+     - y, f, g = K ⊗ f; the trapezoid integrals of f and g
+   * - ``kernel``
+     - ``function {...}``, ``nodes (min max n)`` [m] (n ≥ 2), ``output``
+     - s, pdf(s), cdf(s)
+   * - ``band``
+     - ``input`` (:math:`\lambda` [m], I), ``bands { name (min max); }``
+       [nm], ``output``
+     - name, bounds, integral
+   * - ``front``
+     - ``input`` (x [m], f), ``output``
+     - front location by peakRadiance, maxGradient and riseFraction (0.5,
+       upstream low, end values)
+   * - ``measure``
+     - ``instrument {...}`` (a camera as above, without the shockTube1D
+       entries), ``input`` (first line nx nl; then nl wavelengths, nx
+       positions, nx × nl values), ``output``, ``bandOutput``
+     - the measured field (same format) and the band profiles
+
+Input files with fewer than two rows or a line without two numbers are
+fatal. See :doc:`tests`.
+
+Removed entries
+---------------
+
+The following entries and values were removed on 2026-11-14
+(``docs/RADIATION_RESTRUCTURE.md`` section 6). A case that still gives one
+stops with a FatalIOError naming the behaviour that is kept; delete the
+entry.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 22 50
+
+   * - Entry
+     - Where
+     - Behaviour kept
+   * - ``windowEdge``
+     - species dict or any enclosing dict
+     - every grid point receives the line-profile integral over its own
+       bin, also at the window edges
+   * - ``subBinLines``
+     - species dict or any enclosing dict
+     - same: lines narrower than a bin are integrated over their bin
+   * - ``starkDensity``
+     - species dict or any enclosing dict
+     - electron-impact Stark width with :math:`n_e` and :math:`T_e` of
+       the cell
+   * - ``slabFormula``
+     - ``shockTube1DCoeffs``
+     - :math:`I=-(j/\kappa)\,\mathrm{expm1}(-\kappa D)`
+   * - ``continuum piclas``
+     - top level or species
+     - ``continuum none`` or ``physical``
+   * - ``type piclasInstrBroadening``
+     - instrument function
+     - ``type trapezoid`` (unit-area trapezoid of ``baseWidth`` and
+       ``topWidth``)
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A. (2017). Benchmark shock tube
+  experiments of radiative heating relevant to Earth re-entry. 55th AIAA
+  Aerospace Sciences Meeting, AIAA Paper 2017-1145.
+  doi:10.2514/6.2017-1145.
+* Johnston, C. O. (2006). Nonequilibrium shock-layer radiative heating for
+  Earth and Titan entry. PhD thesis, Virginia Polytechnic Institute and
+  State University.
+* Liu, Y., Lin, J., Huang, G., Guo, Y. and Duan, C. (2001). Simple
+  empirical analytical approximation to the Voigt profile. Journal of the
+  Optical Society of America B, 18(5), 666. doi:10.1364/JOSAB.18.000666.
+* Olivero, J. J. and Longbothum, R. L. (1977). Empirical fits to the Voigt
+  line width: a brief review. Journal of Quantitative Spectroscopy and
+  Radiative Transfer, 17(2), 233-236. doi:10.1016/0022-4073(77)90161-3.
+* Thompson, P., Cox, D. E. and Hastings, J. B. (1987). Journal of Applied
+  Crystallography, 20, 79 (as cited in
+  ``instrument/instrumentFunctions/derived/instrumentVoigt/instrumentVoigt.H``).
+* Whiting, E. E. (1968). An empirical approximation to the Voigt profile.
+  Journal of Quantitative Spectroscopy and Radiative Transfer, 8(6),
+  1379-1384. doi:10.1016/0022-4073(68)90081-2.

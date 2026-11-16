@@ -1,0 +1,520 @@
+Instrument model: reproducing a shock-tube measurement
+======================================================
+
+Source: ``src/radiation/instrument/`` (``instrumentFunctions/`` and
+``shockTubeInstrument/``), used by the ``shockTube1D`` transport mode
+(``src/radiation/transport/derived/shockTube1D/shockTube1D.C``) and verified
+by ``applications/test/radiationInstrument``.
+
+The transport modes of radiationFoam compute the radiance
+:math:`I(x,\lambda)` that leaves the gas (:doc:`/theory/transport`). A
+shock-tube spectrometer such as the NASA Electric Arc Shock Tube (EAST) does
+not record that quantity directly. It records it blurred in wavelength by the
+spectrometer, blurred along the tube by the optics, the camera and the motion
+of the shock during the exposure, and integrated over the wavelength windows
+of its figures. This page explains each of these steps, the way the code
+evaluates them, and the units of every number that is compared with EAST.
+The measurement model follows the definitions of Brandis and Cruden (2017),
+Sec. III.B, IV and Apps. C-D, and Cruden and Brandis (2020), App. A.
+
+
+What the spectrometer sees
+--------------------------
+
+In EAST the shock travels down a tube of diameter :math:`D` = 10.16 cm. An
+imaging spectrometer looks across the tube, through its centreline, and
+records the radiance along the line of sight on a two-dimensional detector:
+one axis is the wavelength :math:`\lambda`, the other the position :math:`x`
+along the tube. ``shockTube1D`` computes the same line-of-sight radiance cell
+by cell: each cell of the 1-D profile is a uniform slab of thickness
+:math:`D`, and its radiance is :math:`I(x,\lambda)` in
+W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1` (see :doc:`/theory/transport`).
+
+Three things separate :math:`I(x,\lambda)` from the recorded signal:
+
+#. the **instrument line shape** (ILS): a monochromatic line is recorded with
+   a finite width set by the slit, the grating and the detector;
+#. the **spatial resolution function** (SRF): a point source along the tube
+   is recorded with a finite extent set by the optics, the camera and the
+   distance the shock moves while the camera gate is open;
+#. the **reduction** that EAST applies to its data: band (window) integrals,
+   the location of the shock front, the nonequilibrium metric and the
+   spectra at chosen distances behind the front.
+
+The first two are convolutions, the third is post-processing of the convolved
+field.
+
+
+Convolution with a normalised kernel
+------------------------------------
+
+Every instrument function is a normalised kernel :math:`K(s)` of the offset
+:math:`s` between the measured coordinate :math:`y` and the source coordinate
+:math:`y'` (:math:`y` is either :math:`\lambda` or :math:`x`):
+
+.. math::
+
+   I_\mathrm{meas}(y) = \int K(y - y')\, I_\mathrm{true}(y')\, \mathrm{d}y',
+   \qquad
+   \int K(s)\,\mathrm{d}s = 1 .
+
+:math:`K(s)` [1/length] is the signal recorded at :math:`y` from a unit delta
+source at :math:`y'`, i.e. the way an ILS is measured with a calibration lamp
+line. Brandis and Cruden (2017, App. D) write the SRF as
+:math:`I_\mathrm{meas}(x) = \int \mathrm{SRF}(\delta x)\, I_\mathrm{true}(x +
+\delta x)\, \mathrm{d}\delta x`, i.e. :math:`K(s) = \mathrm{SRF}(-s)`; every
+EAST function is symmetric, so the two forms agree. The unit area means that a
+convolution moves energy between wavelengths (or positions) but does not
+create or destroy it.
+
+The full measured field is the double convolution
+
+.. math::
+
+   I_\mathrm{meas}(x,\lambda) = \iint K_x(x - x')\, K_\lambda(\lambda - \lambda')\,
+   I(x',\lambda')\, \mathrm{d}x'\, \mathrm{d}\lambda' .
+
+The two kernels act on different axes, so they commute.
+``shockTubeInstrument::measure`` applies the ILS to the spectrum of every cell
+first, then the SRF to the profile of every wavelength. Either kernel may be
+absent, in which case it is the identity.
+
+Each kernel class provides its cumulative distribution
+
+.. math::
+
+   C(s) = \int_{-\infty}^{s} K(t)\,\mathrm{d}t ,
+
+its density :math:`K(s)` (``pdf``), the half range :math:`R` beyond which
+:math:`K = 0` (``support``) and a characteristic full width (``width``: a FWHM
+or a base width). Analytic kernels give :math:`C(s)` in closed form. The others
+fill a piecewise-linear table of nodes :math:`t_k` and densities :math:`p_k`;
+between nodes :math:`C` is then the exact integral of the linear density,
+
+.. math::
+
+   C(t) = C_k + p_k\,\tau + \frac{(p_{k+1} - p_k)\,\tau^2}{2 h_k},
+   \qquad \tau = t - t_k,\quad h_k = t_{k+1} - t_k ,
+
+normalised so that :math:`C(t_\mathrm{last}) = 1` (numerical normalisation,
+as the EAST ILS requires: Brandis and Cruden 2017, App. C).
+
+
+Discrete convolution on the computational grid
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The radiance is known at grid points :math:`y_0 < y_1 < \dots < y_{N-1}`
+(uniform in wavelength, possibly non-uniform in :math:`x` for a DSMC mesh).
+``instrumentFunction::convolve`` treats each point as the owner of a bin:
+
+.. math::
+
+   e_0 = y_0,\quad e_N = y_{N-1},\quad e_i = \tfrac12 (y_{i-1} + y_i),
+   \qquad \Delta_i = e_{i+1} - e_i ,
+
+so :math:`\Delta_i` is the trapezoid weight of point :math:`i`. Source
+:math:`j` carries the content :math:`c_j = \Delta_j f_j`, and the output is
+the bin average of the kernels placed on the sources:
+
+.. math::
+
+   g_i = \sum_j \frac{c_j}{\Delta_i\, n_j}
+   \Big[ C(e_{i+1} - y_j) - C(e_i - y_j) \Big],
+   \qquad
+   n_j = C(e_N - y_j) - C(e_0 - y_j) .
+
+Using the bin mass :math:`C(e_{i+1}-y_j) - C(e_i-y_j)` instead of a sampled
+:math:`K(y_i - y_j)` has three consequences:
+
+* a kernel narrower than the bins reduces to the identity (no aliasing of a
+  narrow top hat or Gaussian);
+* a delta source on the grid returns the bin-averaged kernel exactly;
+* with ``conserveAtEdges true`` (the default) the factor :math:`n_j`
+  gives back to the window the part of a kernel that falls outside it, so the
+  trapezoid integral :math:`\sum_i \Delta_i g_i = \sum_j \Delta_j f_j` holds
+  to round-off for any grid and any kernel. With ``conserveAtEdges false``,
+  :math:`n_j = 1` and the content scattered beyond the window edges is lost,
+  as on a detector of finite size.
+
+The cost is :math:`O(NM)` with :math:`M` the number of points within the
+kernel support. On a uniform grid the interior weights depend on
+:math:`i - j` only and are computed once per call
+(:math:`2M+2` evaluations of :math:`C`).
+
+.. tip::
+
+   Because the convolution conserves the integral, a band integral taken over
+   a range much wider than the ILS is insensitive to the ILS. Peak spectral
+   radiances and the peaks of the spatial profiles are not.
+
+
+Instrument line shape (spectral kernels)
+----------------------------------------
+
+The available kernels are listed below; their dictionary keywords are in
+:doc:`/classes/instrument`. Widths are in metres unless ``lengthUnit``
+(``m``, ``cm``, ``mm``, ``um``, ``nm``) says otherwise.
+
+**Gaussian** (``gaussian``), given its FWHM or its standard deviation:
+
+.. math::
+
+   K(s) = \frac{1}{\sqrt{2\pi}\,\sigma}\exp\!\left(-\frac{s^2}{2\sigma^2}\right),
+   \quad \sigma = \frac{\mathrm{FWHM}}{2\sqrt{2\ln 2}},
+   \quad C(s) = \tfrac12\Big[1 + \mathrm{erf}\big(s/(\sqrt2\,\sigma)\big)\Big],
+
+cut at :math:`|s| = 10\sigma` by default (``cutoff``, a truncated mass of
+about :math:`1.5\times10^{-23}`). It is also the EAST infrared camera
+function of Brandis and Cruden (2017, App. D) with FWHM :math:`= 2 w_G`.
+
+**Voigt** (``voigt``), from the FWHM :math:`f_G` of its Gaussian part and
+:math:`f_L` of its Lorentzian part. With ``form exact`` (default) the
+convolution :math:`G \otimes L` is tabulated at start-up on uniform nodes of
+spacing :math:`f_V/\mathrm{resolution}` (default 100 nodes per
+:math:`f_V`), the Lorentzian averaged over a node cell and convolved with the
+Gaussian cell masses (error :math:`O(h^2/\sigma^2)`). With
+``form pseudoVoigt`` the kernel is the Thompson, Cox and Hastings (1987)
+pseudo-Voigt with an analytic CDF:
+
+.. math::
+
+   f &= \big(f_G^5 + 2.69269 f_G^4 f_L + 2.42843 f_G^3 f_L^2
+          + 4.47163 f_G^2 f_L^3 + 0.07842 f_G f_L^4 + f_L^5\big)^{1/5},\\
+   \eta &= 1.36603\, r - 0.47719\, r^2 + 0.11116\, r^3,
+   \qquad r = f_L/f,\\
+   K(s) &= \eta\, L(s; f) + (1 - \eta)\, G(s; f).
+
+The Lorentzian wings are cut at :math:`|s| = 100 f_V` by default and the
+kernel renormalised there, with :math:`f_V` the Olivero and Longbothum (1977)
+width
+
+.. math::
+
+   f_V = 0.5346\, f_L + \sqrt{0.2166\, f_L^2 + f_G^2} .
+
+:math:`f_G = 0` gives a Lorentzian, :math:`f_L = 0` a Gaussian.
+
+**EAST line shapes** (``eastLineShape``). Brandis and Cruden (2017,
+Sec. IV.A and App. C) fit the measured EAST line shapes with two empirical
+forms, parameterised by the Gaussian and Lorentzian *half* widths at half
+maximum :math:`w_G`, :math:`w_L` of their tables (published in nm: set
+``lengthUnit nm``). With
+
+.. math::
+
+   G(s) = \frac{1}{w_G}\sqrt{\frac{\ln 2}{\pi}}
+          \exp\!\left[-\ln 2\,\Big(\frac{s}{w_G}\Big)^2\right],
+   \qquad
+   L(s) = \frac{1}{\pi w_L}\,\frac{1}{(s/w_L)^2 + 1},
+   \qquad V = L \otimes G ,
+
+the two forms are
+
+.. math::
+
+   \mathrm{ILS1}(s) &= \frac{V(s)^{1/2}}{\int_{-R}^{R} V(t)^{1/2}\,\mathrm{d}t}
+   \qquad (\texttt{form sqrtVoigt}),\\
+   \mathrm{ILS2}(s) &= \frac{G(s) + a\, L(s)}{1 + a},
+   \quad 0 \le a \le 1
+   \qquad (\texttt{form gaussLorentz}).
+
+ILS1 is used below 500 nm and for the camera part of the spatial function;
+ILS2 for the longer-wavelength cameras. The square root of a Voigt decays as
+:math:`1/|s|`, so its integral diverges: the normalisation needs a finite half
+range :math:`R` (``cutoff``, mandatory), and the result depends on it
+logarithmically. Brandis and Cruden (2017, App. C) state that the
+normalisation "is not expressed analytically, and must be done numerically"
+and give no range; the EAST decks of the tutorials use 10 nm (sqrt-Voigt) and
+20 nm (Gauss + Lorentz) and flag the value as unpublished
+(:doc:`/examples/east5029`). ILS2 is truncated at :math:`R` and renormalised
+with its analytic CDF.
+
+.. figure:: /_static/figures/theory/instrument_ils.png
+   :width: 60%
+   :align: center
+
+   Spectral kernels for the EAST UV/Vis camera half widths of shot 50-29
+   (:math:`w_G` = 0.28 nm, :math:`w_L` = 0.070 nm), all of unit area:
+   sqrt-Voigt ILS1 normalised on :math:`|s| \le 10` nm, Gauss + Lorentz ILS2
+   (:math:`a` = 0.2, illustrative), the Voigt and the Gaussian of the same
+   half widths. The ILS1 wings decay as :math:`1/|s|`, which is why its peak
+   depends on the cut-off. Analytical curves; script
+   ``_static/figures/theory/instrument_kernels.py``.
+
+**Tabulated** (``tabulated``): a two-column ASCII file of offset and recorded
+response (any scale), e.g. a calibration-lamp line. The density is linear
+between the file nodes and normalised to unit area over the file range, so
+nothing is resampled. ``centre`` subtracts a given offset;
+``centreFirstMoment true`` puts the centroid at zero instead.
+
+**Top hat** and **trapezoid** are mostly spatial kernels (next section), but
+any kernel can be used on either axis.
+
+
+Spatial resolution and the camera gate smear
+--------------------------------------------
+
+Brandis and Cruden (2017, App. D) write the EAST spatial resolution function
+as the convolution of three parts,
+
+.. math::
+
+   \mathrm{SRF} = f_\mathrm{opt} \otimes f_\mathrm{cam} \otimes f_\mathrm{motion},
+
+built in radiationFoam with a ``composite`` function whose sub-dictionaries
+are the three parts:
+
+* :math:`f_\mathrm{opt}`, the optics: a triangle of base :math:`d_\mathrm{opt}`
+  (Eq. D1) or a trapezoid of bottom :math:`d_\mathrm{opt,2}` and top
+  :math:`d_\mathrm{opt,1}` (Eq. D3), class ``trapezoid`` of bottom width
+  :math:`b`, top width :math:`t` and height :math:`2/(b + t)`:
+
+  .. math::
+
+     K(s) = \frac{2}{b+t}\,\min\!\left[1,\;
+     \max\!\left(0,\; \frac{b/2 - |s|}{(b - t)/2}\right)\right] ;
+
+* :math:`f_\mathrm{cam}`, the camera: a sqrt-Voigt (``eastLineShape``) or a
+  Gaussian (infrared camera), with widths in cm;
+* :math:`f_\mathrm{motion}`, the smear of the shock moving during the gate:
+  a top hat of width
+
+  .. math::
+
+     d_\mathrm{gate} = U_s\, t_\mathrm{gate},
+     \qquad K(s) = \frac{1}{d_\mathrm{gate}}\ \ \text{for}\ |s| < d_\mathrm{gate}/2 ,
+
+  given either as ``width`` or as ``shockSpeed`` [m/s] and ``gateTime`` [s]
+  (always SI; Eq. D2). For shot 50-29 the VUV camera smear is 0.514 cm and the
+  UV/Vis smear 0.257 cm, far larger than the optics (0.041 cm). The top
+  hat is centred: it assumes that :math:`x = 0` is the shock position at
+  mid-gate. Referred to the shock position at the gate opening, the smear is
+  the same top hat shifted by :math:`d_\mathrm{gate}/2`.
+
+The composite is built once at start-up on a uniform table: nodes
+:math:`t_k = -R + k h` with :math:`R` the sum of the component supports and
+:math:`h` = (smallest component width)/``resolution`` (default 200), capped at
+``maxNodes`` (default 400 001) nodes. The components are folded one by one,
+
+.. math::
+
+   K_\mathrm{new}(t_k) = \frac1h \sum_m a_m
+   \Big[C_B\big(t_k - t_m + \tfrac h2\big) - C_B\big(t_k - t_m - \tfrac h2\big)\Big],
+   \qquad
+   a_m = C_A\big(t_m + \tfrac h2\big) - C_A\big(t_m - \tfrac h2\big),
+
+with :math:`A` the functions folded so far and :math:`B` the next one. Both
+factors are cell-integrated, so top hats and kernels narrower than :math:`h`
+are handled, and the error is :math:`O(h^2)` of the smallest width.
+
+.. figure:: /_static/figures/theory/instrument_srf.png
+   :width: 60%
+   :align: center
+
+   Spatial resolution function of the EAST VUV camera of shot 50-29
+   (``tutorials/EAST/east5029``): camera sqrt-Voigt (:math:`w_G` = 0.026 cm,
+   :math:`w_L` = 0.063 cm, cut at 10 cm), gate top hat 0.514 cm, and their
+   composite with the 0.041 cm optics triangle (off the scale, peak
+   48.8 cm\ :sup:`-1`). The gate smear sets the width of the composite; the
+   camera sets its wings. Analytical curves; script
+   ``_static/figures/theory/instrument_kernels.py``.
+
+**Spatial bins.** A DSMC profile may have micrometre cells, far below the
+EAST resolution (0.2-5 mm). With ``spatialBinWidth`` :math:`h_b` the raw
+radiance of the cells is first averaged over uniform bins
+:math:`[x_\mathrm{min} + i h_b,\ x_\mathrm{min} + (i+1) h_b)`, each cell
+weighted by its width (midpoint to midpoint) and each bin placed at the
+weighted mean :math:`x` of its cells (empty bins are skipped). This bounds the
+memory and the cost of the measurement and adds a top hat of width
+:math:`h_b` to the SRF.
+
+
+Band (spectral-window) radiance
+-------------------------------
+
+EAST reports most of its results as radiance integrated over a wavelength
+window :math:`[\lambda_a, \lambda_b]`:
+
+.. math::
+
+   B(x) = \int_{\lambda_a}^{\lambda_b} I_\mathrm{meas}(x,\lambda)\,\mathrm{d}\lambda
+   \qquad [\mathrm{W\,m^{-2}\,sr^{-1}}] .
+
+``shockTubeInstrument::bandIntegral`` integrates the piecewise-linear
+interpolant of the measured spectrum exactly: the band ends are clipped to the
+grid, the interpolant is evaluated at the clipped ends and the trapezoid rule
+is applied interval by interval. The bands of a camera are given in
+``bandUnit`` (``nm`` by default; ``um`` and ``m`` are accepted). A band that
+extends beyond the measured range is clipped with a warning.
+
+.. note::
+
+   The *raw* band integrals of ``bands.csv`` (no instrument) use a different
+   rule: the sum of :math:`I_i\,\Delta\lambda` over the grid points inside the
+   band, a point on a band edge counting as inside
+   (:doc:`/guide/post_processing`). The two agree when the band is wide
+   compared with the grid spacing.
+
+
+Shock alignment
+---------------
+
+The computed profile has its own coordinate :math:`x`; EAST plots its data
+against the distance behind the shock front. Brandis and Cruden (2017) give no
+absolute :math:`x = 0`, so both are aligned on the front. The front
+:math:`x_0` is found on the measured band profile of one band (``shockFront``
+``band``, default the first band) by one of three criteria, or set directly by
+``shockFront`` ``position``:
+
+``peakRadiance`` (default)
+   The location of the maximum of the profile, refined by the vertex of the
+   parabola through the three points around it. With :math:`k` the index of the
+   maximum, :math:`a = x_k - x_{k-1}`, :math:`b = x_k - x_{k+1}`,
+   :math:`f_a = f_k - f_{k+1}` and :math:`f_b = f_k - f_{k-1}`,
+
+   .. math::
+
+      x_0 = x_k - \frac12\,\frac{a^2 f_a - b^2 f_b}{a f_a - b f_b} .
+
+   This is the EAST definition: "the shock front is defined as the location of
+   peak radiance" (Brandis and Cruden 2017, Sec. III.B).
+
+``maxGradient``
+   The location of the steepest rise of the profile from the upstream side
+   into the shocked gas: the slopes at the interval midpoints, signed so that a
+   rise into the shocked gas is positive, then the parabola-refined maximum.
+   A steeper *decrease* downstream (end of the test gas, an expansion, the
+   domain end) is not taken. For shots without an overshoot EAST takes the
+   inflection where the radiance reaches equilibrium; this criterion is the
+   discrete counterpart.
+
+``riseFraction``
+   The first :math:`x`, scanning from the upstream side, where the profile
+   crosses :math:`f_\mathrm{pre} + \phi\,(f_\mathrm{post} - f_\mathrm{pre})`
+   (linear interpolation), with :math:`\phi` = ``fraction`` (0.5 by default:
+   the 50 % rise). :math:`f_\mathrm{pre}` and :math:`f_\mathrm{post}` are the
+   upstream and downstream end values unless ``preValue`` / ``postValue``
+   are given.
+
+``upstreamSide low`` (default) means that :math:`x` increases from the free
+stream into the shocked gas. The distance behind the shock is then
+
+.. math::
+
+   d = \sigma\,(x - x_0), \qquad \sigma = +1\ (\texttt{low}),\quad -1\ (\texttt{high}).
+
+
+Nonequilibrium metric and measured spectra
+------------------------------------------
+
+The **nonequilibrium metric** of a band is the measured band radiance
+integrated over :math:`\pm h` around the front and divided by the tube
+diameter (Brandis and Cruden 2017, Sec. III.B; Cruden and Brandis 2020, Eq. 1):
+
+.. math::
+
+   M = \frac{1}{D} \int_{x_0 - h}^{x_0 + h} B(x)\,\mathrm{d}x
+   \qquad [\mathrm{W\,m^{-2}\,sr^{-1}}],
+
+with :math:`h` = ``metricHalfWidth`` (2 cm in EAST and by default) and
+:math:`D` the ``diameter`` of ``shockTube1DCoeffs``. The interval is clipped
+to the profile and the clipped range is reported. In optically thick ranges
+EAST notes that the metric is not physically meaningful.
+
+**Measured spectra** are extracted from the measured field in three ways:
+
+* ``at d``: the spectrum at distance :math:`d` behind the front, linearly
+  interpolated in :math:`x` between the two cells around
+  :math:`x_0 + \sigma d`; ``at peak`` takes the parabola-refined peak of the
+  front band;
+* ``average (d1 d2)``: the mean spectrum over the distance range,
+  :math:`\frac{1}{x_b - x_a}\int_{x_a}^{x_b} I_\mathrm{meas}\,\mathrm{d}x`,
+  exact for the piecewise-linear profile (EAST "equilibrium" spectra);
+* ``metric h``: the spectral nonequilibrium metric
+  :math:`\frac1D \int_{x_0-h}^{x_0+h} I_\mathrm{meas}\,\mathrm{d}x`.
+
+
+Units of the quantities compared with EAST
+------------------------------------------
+
+Everything inside the code is SI. EAST publishes spectral radiance in
+W cm\ :sup:`-2` sr\ :sup:`-1` µm\ :sup:`-1`, band radiance and metrics in
+W cm\ :sup:`-2` sr\ :sup:`-1`, wavelengths in nm and distances in cm. The
+conversions are static constants of ``shockTubeInstrument``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 20 20
+
+   * - Quantity
+     - Written as
+     - Factor from SI
+     - Constant
+   * - Spectral radiance
+     - W cm\ :sup:`-2` sr\ :sup:`-1` µm\ :sup:`-1`
+     - :math:`10^{-10}`
+     - ``toEASTSpectral``
+   * - Band radiance, metric
+     - W cm\ :sup:`-2` sr\ :sup:`-1`
+     - :math:`10^{-4}`
+     - ``toEASTBand``
+   * - Wavelength
+     - nm
+     - :math:`10^{9}`
+     - (none)
+   * - Distance behind the front
+     - ``distanceUnit`` (m, cm, mm)
+     - 1, :math:`10^{2}`, :math:`10^{3}`
+     - (none)
+
+(:math:`1\ \mathrm{m^{-2}} = 10^{-4}\ \mathrm{cm^{-2}}` and
+:math:`1\ \mathrm{m^{-1}} = 10^{-6}\ \mathrm{\mu m^{-1}}`, hence
+:math:`10^{-10}` for the spectral radiance.) The ``instrument_<camera>_*.csv``
+files are written in these units; the raw outputs and the binary measured
+field stay SI (:doc:`/guide/post_processing`).
+
+EAST quotes a calibration uncertainty of about 30 % (Cruden and Brandis 2020),
+which is the scale of agreement to expect in an absolute comparison.
+
+
+Code path
+---------
+
+In ``shockTube1D`` (one sub-dictionary of ``instrument`` per camera):
+
+#. at start-up each camera builds its ``shockTubeInstrument`` (and the
+   instrument functions, including the composite tables) and selects its
+   window and, optionally, a ``wavelengthRange`` of it;
+#. in the cell loop the raw radiance of every cell on the camera range is
+   copied (or accumulated into its spatial bin); the raw outputs are not
+   changed;
+#. after the loop the cells are sorted by :math:`x` (two cells at the same
+   :math:`x` stop the run), and ``shockTubeInstrument::measure`` applies the
+   ILS then the SRF;
+#. the band profiles, the front :math:`x_0`, the distances, the metrics and
+   the requested spectra are computed and written
+   (``instrument_<camera>_bands.csv``, ``instrument_<camera>_spectra.csv``,
+   optionally ``instrument_<camera>_field.bin``).
+
+The same classes are driven without the solver by
+``Test-radiationInstrument`` (``applications/test/radiationInstrument``),
+which the verification tutorial :doc:`/examples/instrument_tests` uses to check
+every kernel, the convolution, the band integral, the front criteria and the
+complete measurement against analytical results.
+
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of
+  Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences
+  Meeting, AIAA Paper 2017-1145, 2017. doi:10.2514/6.2017-1145
+* Cruden, B. A. and Brandis, A. M., "Measurement of Radiative Nonequilibrium
+  for Air Shocks Between 7 and 9 km/s," *Journal of Thermophysics and Heat
+  Transfer*, 34 (1), 154-180, 2020. doi:10.2514/1.T5735
+* Olivero, J. J. and Longbothum, R. L., "Empirical fits to the Voigt line
+  width: A brief review," *Journal of Quantitative Spectroscopy and Radiative
+  Transfer*, 17 (2), 233-236, 1977. doi:10.1016/0022-4073(77)90161-3
+* Thompson, P., Cox, D. E. and Hastings, J. B., *Journal of Applied
+  Crystallography*, 20, 79, 1987 (pseudo-Voigt; reference as given in
+  ``instrumentVoigt.H``).

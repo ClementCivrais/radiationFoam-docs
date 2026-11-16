@@ -1,0 +1,279 @@
+Post-processing
+===============
+
+radiationFoam writes no OpenFOAM fields. Every result is a text (CSV) or
+binary file in ``postProcessing/radiationFoam/`` of the case, written once at
+the end of the run. This page lists the files of each transport mode, their
+columns and units, shows how to read and plot them, and explains how to
+compare the measured quantities with EAST data.
+
+Units: everything is SI except where the file says otherwise. Wavelengths in
+CSV files are in nm. The files of the instrument (``instrument_*.csv``) are in
+the EAST units (W cm\ :sup:`-2` sr\ :sup:`-1` µm\ :sup:`-1` and
+W cm\ :sup:`-2` sr\ :sup:`-1`). CSV files are written with 17 significant
+digits. Header lines starting with ``#`` are comments; read them with
+``pandas.read_csv(file, comment='#')``.
+
+
+singleCell mode
+---------------
+
+Source: ``src/radiation/transport/derived/singleCell/singleCell.C``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 30 44
+
+   * - File
+     - Columns
+     - Content and units
+   * - ``spectrum.csv``
+     - ``wavelength, emission_coefficient, absorption_coefficient``
+     - Vacuum wavelength [nm]; emission coefficient :math:`j_\lambda`
+       [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and absorption coefficient
+       :math:`\kappa_\lambda` [m\ :sup:`-1`] (net of induced emission), summed
+       over the species and the continuum.
+   * - ``populations_<species>.csv``
+     - ``key, g, energy, number_density``
+     - One row per level of the species: level key, degeneracy, energy [J],
+       number density [m\ :sup:`-3`] given by the population model.
+   * - ``continuum.csv`` (only with an active continuum)
+     - ``wavelength`` then ``<process>_emission, <process>_absorption`` per
+       continuum process
+     - [nm], [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`], [m\ :sup:`-1`].
+
+The log also prints, per species and continuum process,
+:math:`4\pi\int j_\lambda\,\mathrm{d}\lambda` [W m\ :sup:`-3`] and
+:math:`\int\kappa_\lambda\,\mathrm{d}\lambda` [m\ :sup:`-1` m] over the grid.
+
+.. code-block:: python
+
+   import pandas as pd, matplotlib.pyplot as plt
+   s = pd.read_csv('postProcessing/radiationFoam/spectrum.csv')
+   fig, ax = plt.subplots()
+   ax.plot(s.wavelength, s.emission_coefficient, 'r-')
+   ax.set_xlabel('Wavelength (nm)')
+   ax.set_ylabel(r'$j_\lambda$ (W m$^{-3}$ sr$^{-1}$ m$^{-1}$)')
+
+   p = pd.read_csv('postProcessing/radiationFoam/populations_N.csv')
+   # Boltzmann plot: ln(n/g) against E is a line of slope -1/(k T) for
+   # boltzmannTemperatures, and anything for a DSMC cellDistribution
+   import numpy as np
+   ax2 = plt.figure().gca()
+   m = p.number_density > 0
+   ax2.plot(p.energy[m]/1.602176634e-19, np.log(p.number_density[m]/p.g[m]), 'r.')
+   ax2.set_xlabel('Level energy (eV)'); ax2.set_ylabel(r'$\ln(n_i/g_i)$')
+
+
+shockTube1D mode
+----------------
+
+Source: ``src/radiation/transport/derived/shockTube1D/shockTube1D.C``. The
+cells are numbered :math:`k`: the profile cells sorted by :math:`x`
+(0 .. N-1), or, with ``cellDistribution``, the index of the distribution
+files. The radiance of a cell is the radiance across the tube,
+:math:`I_\lambda = -(j_\lambda/\kappa_\lambda)\,\mathrm{expm1}(-\kappa_\lambda
+D)` [W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1`] (:doc:`/theory/transport`).
+
+Raw outputs (no instrument)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 30 44
+
+   * - File
+     - Columns
+     - Content and units
+   * - ``bands.csv``
+     - ``k, x``, one column per band, ``window_<name>`` per window
+     - :math:`x` [m]; radiance integrated over each band and each whole window
+       [W m\ :sup:`-2` sr\ :sup:`-1`] by the rectangle rule
+       :math:`\sum_{\lambda_i\in[a,b]} I_i\,\Delta\lambda` (a grid point on a
+       band edge is inside). The header gives the grid index range of each
+       band.
+   * - ``profile.csv``
+     - ``k, x, n_e, T_e``; per species ``n_<s>, Ttrans_<s>, Trot_<s>,
+       Tvib_<s>, Telec_<s>``; ``emission_<window>``
+     - The cell states actually used [m\ :sup:`-3`, K] and
+       :math:`4\pi\int j_\lambda\,\mathrm{d}\lambda` of each window
+       [W m\ :sup:`-3`].
+   * - ``spectra_<window>.bin`` + ``.info``
+     - binary, see below
+     - Radiance spectra [W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1`] of the
+       cells selected by ``writeSpectra`` (``all`` by default, ``none``, or
+       ``(k0 k1 ...)``).
+   * - ``emission_<window>.bin``, ``absorption_<window>.bin``
+     - binary, same layout
+     - With ``writeCoefficients true``: :math:`j_\lambda`
+       [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and :math:`\kappa_\lambda`
+       [m\ :sup:`-1`] of the same cells.
+   * - ``distribution/cells``, ``distribution/cell<k>``
+     - format of ``dsmcRadiationDistribution``
+     - With ``writeDistributions`` (``all`` or a list): the level populations
+       of the population model [m\ :sup:`-3`], 17 digits, so that a
+       Boltzmann profile can be replayed through ``cellDistribution``
+       (:doc:`/guide/dsmcfoam_coupling`).
+
+The binary files are float64 in the byte order of the machine (little endian
+on x86), row-major, one row of ``nPoints`` values per selected cell. The
+``.info`` file gives the byte order, the grid
+(``lambdaMin_nm``, ``lambdaMax_nm``, ``nPoints``;
+:math:`\lambda_i = \lambda_\mathrm{min} + i(\lambda_\mathrm{max} -
+\lambda_\mathrm{min})/(\mathrm{nPoints}-1)`), ``diameter_m``, and after the
+line ``row,k,x`` the cell of each row:
+
+.. code-block:: python
+
+   import numpy as np
+
+   def read_spectra(stem):
+       """stem = 'postProcessing/radiationFoam/spectra_IR'"""
+       info = open(stem + '.info').read().splitlines()
+       kv = dict(l.split()[:2] for l in info
+                 if l and not l.startswith('#') and ' ' in l)
+       n = int(kv['nPoints'])
+       lam = np.linspace(float(kv['lambdaMin_nm']), float(kv['lambdaMax_nm']), n)
+       rows = info[info.index('row,k,x') + 1:]
+       k = [int(r.split(',')[1]) for r in rows if r]
+       x = [float(r.split(',')[2]) for r in rows if r]
+       I = np.fromfile(stem + '.bin', dtype='<f8').reshape(len(k), n)
+       return lam, np.array(k), np.array(x), I    # I in W m^-2 sr^-1 m^-1
+
+   lam, k, x, I = read_spectra('postProcessing/radiationFoam/spectra_IR')
+   # spectral radiance in W cm^-2 sr^-1 um^-1: I*1e-10
+
+(Use ``'>f8'`` if the ``.info`` file says big endian.)
+
+Instrument outputs
+~~~~~~~~~~~~~~~~~~
+
+One set per camera of the ``instrument`` sub-dictionary
+(:doc:`/theory/instrument`, :doc:`/classes/instrument`). The raw outputs
+above are unchanged by the instrument.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 26 44
+
+   * - File
+     - Columns
+     - Content and units
+   * - ``instrument_<camera>_bands.csv``
+     - ``k, x, distance``, one column per band of the camera
+     - Cells (or spatial bins) sorted by :math:`x` [m]; distance behind the
+       front :math:`\sigma(x - x_0)` [``distanceUnit``]; measured band
+       radiance [W cm\ :sup:`-2` sr\ :sup:`-1`], the exact integral of the
+       measured spectrum. The header gives the window and points, the bands,
+       the front criterion and :math:`x_0` [m], the metric interval actually
+       used, and one line ``# metric <band> <value> W cm^-2 sr^-1`` per band.
+   * - ``instrument_<camera>_spectra.csv``
+     - ``lambda_nm``, one column per entry of ``spectra``
+     - Measured spectral radiance [W cm\ :sup:`-2` sr\ :sup:`-1`
+       µm\ :sup:`-1`]; the header gives :math:`x_0` and, per column, where it
+       was taken (``at``, ``average``, ``metric``, with the :math:`x` range).
+   * - ``instrument_<camera>_field.bin`` + ``.info``
+     - binary, as ``spectra_<window>``
+     - With ``writeField true``: the whole measured field, SI
+       (W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1`), one row per cell sorted
+       by :math:`x` (``k`` = bin index with ``spatialBinWidth``); the
+       ``.info`` has no ``diameter_m`` line.
+
+Reading the metrics from the header:
+
+.. code-block:: python
+
+   import pandas as pd, matplotlib.pyplot as plt
+   f = 'postProcessing/radiationFoam/instrument_VUV_bands.csv'
+   metric = {l.split()[2]: float(l.split()[3])
+             for l in open(f) if l.startswith('# metric ')}
+   b = pd.read_csv(f, comment='#')
+   fig, ax = plt.subplots()
+   ax.plot(b.distance, b.VUV_EAST, 'r-', label='present')
+   ax.set_xlabel('Distance behind the shock (cm)')
+   ax.set_ylabel('Radiance, 162-218 nm (W cm$^{-2}$ sr$^{-1}$)')
+
+   s = pd.read_csv('postProcessing/radiationFoam/instrument_VUV_spectra.csv',
+                   comment='#')
+   ax2 = plt.figure().gca()
+   ax2.plot(s.lambda_nm, s.equilibrium, 'r-')
+   ax2.set_ylabel(r'Spectral radiance (W cm$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)')
+
+
+Log file
+--------
+
+``log.radiationFoam`` reports the set-up time, the population and transport
+models, the instrument functions built (with the composite table sizes),
+per window the integrals of the coefficients, the cell-loop time
+(``Cells computed: ... s per cell``), the measurement time of each camera
+(``Camera <name>: measurement ... s CPU``), each file written and every
+warning (clipped bands, clipped metric or spectrum ranges, species without
+an electronic temperature).
+
+
+Comparison with EAST data
+-------------------------
+
+The instrument files are built to be compared with the published EAST
+results of Brandis and Cruden (2017) and Cruden and Brandis (2020) without
+any further conversion:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 32 34 34
+
+   * - EAST quantity
+     - radiationFoam output
+     - Notes
+   * - Radiance profile in a window vs distance
+     - ``instrument_<camera>_bands.csv``, column of the band, against
+       ``distance``
+     - Same window as the EAST figure; ILS and SRF of the shot; front by the
+       EAST criterion (``peakRadiance``, or ``maxGradient`` for shots without
+       overshoot).
+   * - Nonequilibrium metric
+     - ``# metric`` header lines
+     - :math:`(1/D)\int_{x_0-2\,\mathrm{cm}}^{x_0+2\,\mathrm{cm}} B\,
+       \mathrm{d}x`; check that the interval was not clipped.
+   * - Equilibrium radiance
+     - band column far behind the front, or the band integral of an
+       ``average`` spectrum
+     - On a uniform equilibrium column every row is the value
+       (:doc:`/examples/east_equilibrium`).
+   * - Spectra (nonequilibrium, equilibrium, metric)
+     - ``instrument_<camera>_spectra.csv``
+     - ``at peak``, ``average (d1 d2)``, ``metric 2``.
+
+Practical rules:
+
+* **Same instrument as the shot.** Use the ILS and SRF of the shot and
+  camera (Brandis and Cruden 2017, Tables C and D). Band integrals over wide
+  windows hardly depend on them; peak spectral radiance and profile peaks do
+  (:doc:`/examples/east5029`, FLAGS).
+* **Window wider than the camera.** Widen the computational window by the ILS
+  cut-off on each side so that the convolution near the band edges sees the
+  radiation outside the band.
+* **Same alignment.** EAST gives no absolute :math:`x`; compare against the
+  distance behind the front, with the front located on the *measured*
+  profile by the same criterion.
+* **Same side of the tube.** ``upstreamSide low`` assumes the free stream
+  enters at low :math:`x` (the shock frame of the dsmcFoam decks).
+* **Uncertainty.** EAST quotes about 30 % calibration uncertainty (Cruden and
+  Brandis 2020); impurity lines (C I, H, CN) in the measured spectra have no
+  counterpart in air and should be masked.
+* **Figures.** Plot present results in red and EAST data in black (open
+  symbols), on the units of the paper; the comparison scripts of the
+  equilibrium validation (``run/RAD/EAST/equilibrium/compare_pass2.py`` of
+  the DSMC_Rovibronic repository) are a worked example.
+
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of
+  Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences
+  Meeting, AIAA Paper 2017-1145, 2017. doi:10.2514/6.2017-1145
+* Cruden, B. A. and Brandis, A. M., "Measurement of Radiative Nonequilibrium
+  for Air Shocks Between 7 and 9 km/s," *Journal of Thermophysics and Heat
+  Transfer*, 34 (1), 154-180, 2020. doi:10.2514/1.T5735

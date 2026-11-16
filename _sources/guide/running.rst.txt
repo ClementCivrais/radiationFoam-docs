@@ -1,0 +1,278 @@
+Running radiationFoam
+=====================
+
+``radiationFoam`` (``applications/solvers/radiationFoam/radiationFoam.C``)
+computes, line by line, the spectral emission and absorption coefficients
+of the radiating species of a gas and the radiation that leaves it. It is a
+one-pass application: there is no time loop. It reads one dictionary,
+builds the models named there, runs one transport mode and writes its
+results to ``postProcessing/radiationFoam/``.
+
+What the application does
+-------------------------
+
+``radiationFoam.C`` is short on purpose: every physical model is a library
+class (:doc:`architecture`). In order, ``main()``
+
+#. creates the case time from ``system/controlDict`` (``setRootCase.H``,
+   ``createTime.H``); the time only supplies the case paths;
+#. reads ``system/radiationProperties`` (``MUST_READ``);
+#. builds one radiator per sub-dictionary of ``species``
+   (``radiatingSpecies::New``, selected by the entry ``model``). The level
+   lists and line lists are built here, once; the log reports the set-up
+   time;
+#. builds the population model (``radiationPopulationModel::New``, entry
+   ``populationModel``);
+#. builds the continuum processes (``continuumProcesses``, entry
+   ``continuum``, default ``none``);
+#. selects the transport model by the entry ``mode``
+   (``radiationTransportModel::New``) and calls its ``solve()``.
+
+The transport model reads its own sub-dictionaries (the spectral grids and
+the cell states), loops over the cells and writes the outputs.
+
+Serial only
+-----------
+
+The application calls ``argList::noParallel()``: it runs on one core and
+has no ``-parallel`` option. Parallelism lies upstream, in the DSMC run.
+For a decomposed dsmcFoam run:
+
+* run ``reconstructPar`` on the dsmcFoam case before radiationFoam reads
+  it (profile source ``dsmcCase``). A dsmcFoam case whose ``processor0``
+  holds a later time than the case root, or a requested time that exists
+  only in ``processor0``, stops with a FatalIOError that says so
+  (``shockTubeProfile.C``);
+* the level-distribution files of ``dsmcRadiationDistribution`` need no
+  reconstruction: the function object writes one file per selected cell,
+  numbered independently of the decomposition (:doc:`dsmcfoam_coupling`).
+
+To process many independent cases at once (for example the 50 EAST
+equilibrium decks), run several radiationFoam processes side by side, one
+per case directory.
+
+Case layout
+-----------
+
+A radiationFoam case needs two files, and no mesh unless a dsmcFoam case
+is read:
+
+.. code-block:: text
+
+   myRadiationCase/
+   ├── system/
+   │   ├── controlDict            # application radiationFoam; one step
+   │   └── radiationProperties    # everything else (input_reference)
+   └── constant/                  # optional: profile.csv, distribution files,
+                                  # tabulated instrument functions
+
+``system/controlDict`` is the standard OpenFOAM file. The tutorials use
+
+.. code-block:: c++
+
+   application     radiationFoam;
+   startFrom       startTime;
+   startTime       0;
+   stopAt          endTime;
+   endTime         0;
+   deltaT          1;
+   writeControl    timeStep;
+   writeInterval   1;
+
+Data files are named by path in ``radiationProperties``. Paths may use
+environment variables (``$RADIATIONFOAM_DIR``, ``$DSMC_CASE``) and the
+OpenFOAM tags ``<case>`` and ``<constant>``. The profile file, the dsmcFoam
+case and the distribution directory of ``shockTube1D`` are taken relative
+to the case directory when they are not absolute; the other files
+(transition files, ``distributionFile`` of ``singleCell``, tabulated
+instrument functions) are opened as written after the expansion, so give
+them with ``$RADIATIONFOAM_DIR``, ``<case>`` or an absolute path.
+
+Required dictionaries
+---------------------
+
+``system/radiationProperties`` always holds
+
+.. code-block:: c++
+
+   mode            singleCell;               // or shockTube1D
+   populationModel boltzmannTemperatures;    // or cellDistribution
+   continuum       none;                     // optional: none (default) | physical
+
+   species                                   // one sub-dictionary per radiator
+   {
+       N
+       {
+           model           atomicLines;      // or diatomicBands
+           mass            2.326e-26;        // [kg]
+           radius          0.7e-10;          // [m]
+           atomicLinesCoeffs
+           {
+               transitionFile   "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat";
+               ionisationEnergy 117225.7;    // [cm^-1]
+               starkExponent    0.33;
+               lineShape        voigtWhitingOliveroLongbothum;
+           }
+       }
+   }
+
+plus the sub-dictionaries of the mode:
+
+* ``singleCell``: ``spectralGrid`` and ``cellState``;
+* ``shockTube1D``: ``shockTube1DCoeffs`` (diameter, windows, bands,
+  profile, optional distribution and instrument).
+
+Every keyword, its type, default and source file is listed in
+:doc:`input_reference`.
+
+Running a case
+--------------
+
+.. code-block:: bash
+
+   source <OpenFOAM-v2512>/etc/bashrc
+   export RADIATIONFOAM_DIR=<radiationFoam checkout>
+   cd myRadiationCase
+   radiationFoam > log.radiationFoam 2>&1
+
+The tutorials do the same through ``runApplication radiationFoam``
+(``Allrun``); ``Allclean`` removes the outputs. The log reports the
+species, levels and lines read, the population model, the continuum
+processes, the transport mode, every window and band, the cells read and
+the CPU time per cell, and finally ``End``.
+
+Three routes to a spectrum
+--------------------------
+
+The populations of the radiating levels come either from temperatures
+(Boltzmann re-expansion, ``boltzmannTemperatures``) or from the level
+distribution of each cell (``cellDistribution``). The cell states come from
+the dictionary, from a macro file or from a dsmcFoam case. The three usual
+routes are:
+
+**1. One cell from the dictionary** (``mode singleCell``). Give the number
+density and the temperatures of each species and the electrons in
+``cellState``; the output is the emission and absorption coefficients of
+that cell on ``spectralGrid``. Optionally, with
+``populationModel cellDistribution``, the level populations are read from
+the file named by ``cellState/distributionFile``. Tutorials
+``singleCell_N`` and ``singleCell_O`` (:doc:`/examples/singleCell_N`).
+
+**2. A 1-D profile from a macro file** (``mode shockTube1D``,
+``profile { source macroFile; }``). A comma-separated file holds one row
+per cell: ``x``, optional ``n_e`` and ``T_e``, and for each radiating
+species ``n_<s>``, ``Ttrans_<s>`` and optionally ``Trot_<s>``, ``Tvib_<s>``,
+``Telec_<s>``. Any code that writes such a table can feed radiationFoam.
+Tutorial ``shockTube1D/macroFile`` (:doc:`/examples/shockTube1D`).
+
+**3. A 1-D profile from a dsmcFoam run** (``mode shockTube1D``,
+``profile { source dsmcCase; }``). radiationFoam reads the mesh and the
+``dsmcVolFields`` fields of a reconstructed time of the dsmcFoam case
+(``rhoN_<s>``, ``translationalT_<s>``, ``internalT_<s>`` by default; field
+names can be changed per species). With ``populationModel
+cellDistribution`` and a ``distribution`` sub-dictionary, the level
+populations of every cell are the (n,v,J) number densities sampled by
+dsmcFoam (:doc:`dsmcfoam_coupling`), and the profile only supplies the
+translational temperatures, number densities and electrons for the line
+widths. Tutorials ``shockTube1D/fromDsmcCase`` (temperatures) and
+``EAST/east5029`` (sampled distributions, :doc:`/examples/east5029`).
+
+Typical workflow from a dsmcFoam run
+------------------------------------
+
+#. In the dsmcFoam case, sample the fields with ``dsmcVolFields`` (one
+   instance per radiating species, and one for the electrons) and, for the
+   state-resolved route, add the ``dsmcRadiationDistribution`` function
+   object of ``libdsmcRadiationCoupling`` (``controlDict``:
+   ``libs (dsmcRadiationCoupling);``). See :doc:`dsmcfoam_coupling`.
+#. Run dsmcFoam to a steady (or frozen, shock-frame) state with an
+   averaging block long enough for the radiating levels, which are rare.
+#. ``reconstructPar`` the time to be processed.
+#. Create the radiation case: ``system/controlDict`` and
+   ``system/radiationProperties`` with ``mode shockTube1D``,
+   ``profile { source dsmcCase; case "<path>"; time latestTime; }``,
+   ``populationModel cellDistribution`` and
+   ``distribution { directory "<case>/postProcessing/dsmcRadiationDistribution/<name>/<time>"; }``.
+   Choose ``cellDistributionCoeffs { missingLevels zero; }`` or
+   ``boltzmannFill`` (levels the DSMC ladder does not carry).
+#. Define the spectral windows (grid spacing fine enough for the line
+   widths), the bands, and optionally the instrument cameras.
+#. Run ``radiationFoam``. For a quick look at a large run, process every
+   k-th distribution cell only (the ``STRIDE`` option of the
+   ``EAST/east5029`` ``Allrun`` copies such a subset).
+#. Post-process ``postProcessing/radiationFoam/`` (:doc:`post_processing`).
+
+Outputs
+-------
+
+All outputs are written to ``postProcessing/radiationFoam/`` of the
+radiation case:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - File
+     - Mode
+     - Content
+   * - ``spectrum.csv``
+     - singleCell
+     - wavelength [nm], emission coefficient
+       :math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`],
+       absorption coefficient :math:`\kappa_\lambda` [m\ :sup:`-1`]
+   * - ``populations_<s>.csv``
+     - singleCell
+     - key, g, energy [J], number density [m\ :sup:`-3`] of each level
+   * - ``continuum.csv``
+     - singleCell
+     - emission and absorption of each continuum process (active
+       continuum only)
+   * - ``bands.csv``
+     - shockTube1D
+     - per cell k: x and the radiance integrated over each band and each
+       window [W m\ :sup:`-2` sr\ :sup:`-1`]
+   * - ``profile.csv``
+     - shockTube1D
+     - the cell states used and :math:`4\pi\int j_\lambda\,d\lambda` of
+       each window [W m\ :sup:`-3`]
+   * - ``spectra_<window>.bin``, ``.info``
+     - shockTube1D
+     - radiance spectra of the selected cells (float64, one row per cell)
+       and their description
+   * - ``emission_<window>.bin``, ``absorption_<window>.bin``
+     - shockTube1D
+     - with ``writeCoefficients true``
+   * - ``distribution/cells``, ``distribution/cell<k>``
+     - shockTube1D
+     - with ``writeDistributions``: the level populations used, in the
+       ``dsmcRadiationDistribution`` format
+   * - ``cellDistributionFill.csv``
+     - both
+     - with ``missingLevels boltzmannFill``: the share of the emission
+       carried by filled levels
+   * - ``instrument_<camera>_bands.csv``, ``_spectra.csv``, ``_field.bin``
+     - shockTube1D
+     - measured band profiles, spectra and (optional) field of each camera
+
+The formats are described in :doc:`post_processing`.
+
+Common errors
+-------------
+
+Every input error stops with a FatalError or FatalIOError naming the entry.
+The most frequent:
+
+* ``Cannot open`` a transition file: ``RADIATIONFOAM_DIR`` is not set in the
+  shell that runs radiationFoam.
+* ``nPoints = ... is below 100``: a spectral grid needs at least 100
+  points.
+* ``Band ... lies in no window``: a band must lie inside one window.
+* ``... was removed``: the case gives one of the entries removed on
+  2026-11-14 (``windowEdge``, ``subBinLines``, ``starkDensity``,
+  ``slabFormula``, ``continuum piclas``, ``type piclasInstrBroadening``);
+  the message states the behaviour that is kept. Delete the entry.
+* ``Distribution cell ... matches no profile cell``: the distribution files
+  and the profile come from different meshes or directions.
+* ``... is outside the profile``: a measured spectrum asks for a distance
+  behind the shock that the profile does not reach (EAST equilibrium
+  spectra need a domain extending far enough behind the front).

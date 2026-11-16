@@ -1,0 +1,1029 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Line shapes and broadening &mdash; radiationFoam</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=eef4a3d2"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Continuum radiation" href="continuum.html" />
+    <link rel="prev" title="Diatomic band systems, line by line" href="diatomic_bands.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #1f3b5a" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            radiationFoam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User and Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guide/index.html">User and Developer Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../guide/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#getting-the-source">Getting the source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#building">Building</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#where-the-files-go">Where the files go</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#cleaning">Cleaning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#checking-the-installation">Checking the installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#building-the-documentation-locally">Building the documentation locally</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/installation.html#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/running.html">Running radiationFoam</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#what-the-application-does">What the application does</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#serial-only">Serial only</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#case-layout">Case layout</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#required-dictionaries">Required dictionaries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#running-a-case">Running a case</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#three-routes-to-a-spectrum">Three routes to a spectrum</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#typical-workflow-from-a-dsmcfoam-run">Typical workflow from a dsmcFoam run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#outputs">Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/running.html#common-errors">Common errors</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/input_reference.html">Input Reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#top-level-of-radiationproperties">Top level of <code class="docutils literal notranslate"><span class="pre">radiationProperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#radiating-species">Radiating species</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#common-entries-species-s">Common entries: <code class="docutils literal notranslate"><span class="pre">species/&lt;s&gt;</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#atomiclinescoeffs"><code class="docutils literal notranslate"><span class="pre">atomicLinesCoeffs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#diatomicbandscoeffs"><code class="docutils literal notranslate"><span class="pre">diatomicBandsCoeffs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#population-models">Population models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#continuum">Continuum</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#mode-singlecell">Mode <code class="docutils literal notranslate"><span class="pre">singleCell</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#spectralgrid"><code class="docutils literal notranslate"><span class="pre">spectralGrid</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#cellstate"><code class="docutils literal notranslate"><span class="pre">cellState</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#level-distribution-file">Level-distribution file</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#mode-shocktube1d">Mode <code class="docutils literal notranslate"><span class="pre">shockTube1D</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#shocktube1dcoeffs"><code class="docutils literal notranslate"><span class="pre">shockTube1DCoeffs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#profile"><code class="docutils literal notranslate"><span class="pre">profile</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#macro-file">Macro file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#distribution"><code class="docutils literal notranslate"><span class="pre">distribution</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#instrument-cameras">Instrument cameras</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/input_reference.html#instrument-function">Instrument function</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#test-application-dictionary">Test application dictionary</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#removed-entries">Removed entries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/input_reference.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/dsmcfoam_coupling.html">Coupling with dsmcFoam</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#summary">Summary</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#route-1-temperatures-of-a-dsmcfoam-case">Route 1: temperatures of a dsmcFoam case</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#route-2-sampled-level-populations">Route 2: sampled level populations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#the-dsmc-side-writer-dsmcradiationdistribution">The DSMC-side writer: <code class="docutils literal notranslate"><span class="pre">dsmcRadiationDistribution</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#matching-dsmc-levels-to-spectroscopic-levels">Matching DSMC levels to spectroscopic levels</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#the-radiationfoam-side">The radiationFoam side</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#radiative-processes-inside-dsmcfoam">Radiative processes inside dsmcFoam</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#two-way-coupling-concept-design-not-implemented">Two-way coupling concept (design, not implemented)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/dsmcfoam_coupling.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/post_processing.html">Post-processing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/post_processing.html#singlecell-mode">singleCell mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/post_processing.html#shocktube1d-mode">shockTube1D mode</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/post_processing.html#raw-outputs-no-instrument">Raw outputs (no instrument)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../guide/post_processing.html#instrument-outputs">Instrument outputs</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/post_processing.html#log-file">Log file</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/post_processing.html#comparison-with-east-data">Comparison with EAST data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/post_processing.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/architecture.html">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#design-rules">Design rules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#directory-map">Directory map</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#run-time-selection-tables">Run-time selection tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#data-flow">Data flow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#dependencies-between-families">Dependencies between families</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/architecture.html#what-each-base-class-requires-of-a-model">What each base class requires of a model</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/adding_a_feature.html">Adding a Feature</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#conventions">Conventions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#adding-a-line-shape">Adding a line shape</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#adding-a-population-model">Adding a population model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#adding-a-radiator">Adding a radiator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#adding-an-instrument-function">Adding an instrument function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#adding-a-continuum-process-or-a-transport-mode">Adding a continuum process or a transport mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/adding_a_feature.html#checklist-before-committing">Checklist before committing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../guide/tests.html">Tests</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#the-instrument-test-suite">The instrument test suite</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#tutorial-based-checks">Tutorial-based checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#which-outputs-must-stay-identical">Which outputs must stay identical</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../guide/tests.html#running-an-md5-regression">Running an md5 regression</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#verification-sets">Verification sets</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Theory Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Theory Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="foundations.html">Spectral quantities and conventions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#wavelength-grid">Wavelength grid</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="foundations.html#wavelengths-and-wavenumbers">Wavelengths and wavenumbers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="foundations.html#physical-constants">Physical constants</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#emission-and-absorption-coefficients">Emission and absorption coefficients</a></li>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#source-function">Source function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#radiative-transfer-equation">Radiative transfer equation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#map-physics-to-library-directory">Map: physics to library directory</a></li>
+<li class="toctree-l3"><a class="reference internal" href="foundations.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="populations.html">Level populations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="populations.html#the-contract-levels-cell-state-populations">The contract: levels, cell state, populations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="populations.html#route-1-boltzmann-re-expansion-from-temperatures">Route 1: Boltzmann re-expansion from temperatures</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#which-temperatures">Which temperatures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#atoms">Atoms</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#diatomics">Diatomics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#lower-population-seen-by-the-absorption">Lower population seen by the absorption</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="populations.html#route-2-the-cell-s-level-distribution">Route 2: the cell’s level distribution</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#distribution-file">Distribution file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#mapping-and-normalisation">Mapping and normalisation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#bound-limit">Bound limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#missing-levels-zero-or-boltzmannfill">Missing levels: <code class="docutils literal notranslate"><span class="pre">zero</span></code> or <code class="docutils literal notranslate"><span class="pre">boltzmannFill</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="populations.html#diagnostics-of-the-fill">Diagnostics of the fill</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="populations.html#which-levels-emit-line-selection">Which levels emit: line selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="populations.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="atomic_lines.html">Atomic bound-bound lines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#data-per-level-and-per-line">Data per level and per line</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#einstein-coefficients-and-oscillator-strengths">Einstein coefficients and oscillator strengths</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#emission-and-absorption-of-one-line">Emission and absorption of one line</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="atomic_lines.html#stimulated-emission-and-line-gain">Stimulated emission and line gain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atomic_lines.html#lumped-levels-and-the-ratio-g-mathrm-line-g">Lumped levels and the ratio <span class="math notranslate nohighlight">\(g^{\mathrm{line}}/g\)</span></a></li>
+<li class="toctree-l4"><a class="reference internal" href="atomic_lines.html#multiplets">Multiplets</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#which-lines-are-computed">Which lines are computed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#line-widths">Line widths</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atomic_lines.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="diatomic_bands.html">Diatomic band systems, line by line</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#systems-in-the-database">Systems in the database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#data-of-a-molecule-file">Data of a molecule file</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#term-values-and-line-positions">Term values and line positions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#line-strength">Line strength</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="diatomic_bands.html#emission">Emission</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diatomic_bands.html#absorption">Absorption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diatomic_bands.html#which-lines-are-placed">Which lines are placed</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#rotational-structure">Rotational structure</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="diatomic_bands.html#branches">Branches</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diatomic_bands.html#hoenl-london-factors-and-their-normalisation">Hoenl-London factors and their normalisation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#parity-nuclear-spin-and-the-alternation-factor">Parity, nuclear spin and the alternation factor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#levels-and-statistical-weights">Levels and statistical weights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#line-widths">Line widths</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#forms-kept-from-the-verified-version">Forms kept from the verified version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="diatomic_bands.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Line shapes and broadening</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gaussian-and-lorentzian-profiles">Gaussian and Lorentzian profiles</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#broadening-of-the-atomic-lines">Broadening of the atomic lines</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#doppler-width">Doppler width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#natural-width">Natural width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#phase-interruption-impact-width">Phase-interruption (impact) width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resonance-width">Resonance width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#van-der-waals-width">van der Waals width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#stark-width">Stark width</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#total-lorentz-width">Total Lorentz width</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#broadening-of-the-diatomic-lines">Broadening of the diatomic lines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#the-voigt-profile">The Voigt profile</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#voigt-width-atomic-lines">Voigt width (atomic lines)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#whiting-shape">Whiting shape</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#truncation-and-cumulative-table">Truncation and cumulative table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#placement-on-the-spectral-grid">Placement on the spectral grid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="continuum.html">Continuum radiation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#selection">Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#bound-free-continuum">Bound-free continuum</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="continuum.html#photoionisation-cross-sections">Photoionisation cross sections</a></li>
+<li class="toctree-l4"><a class="reference internal" href="continuum.html#emission-from-absorption-the-milne-relation">Emission from absorption: the Milne relation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#free-free-continuum">Free-free continuum</a></li>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#constants">Constants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#outputs">Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="continuum.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="transport.html">Radiative transfer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="transport.html#the-radiative-transfer-equation">The radiative transfer equation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="transport.html#uniform-slab">Uniform slab</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="transport.html#singlecell-emission-and-absorption-of-one-cell">singleCell: emission and absorption of one cell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="transport.html#shocktube1d-radiance-across-a-shock-tube">shockTube1D: radiance across a shock tube</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="transport.html#geometry">Geometry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transport.html#mapping-the-profile-onto-the-tube">Mapping the profile onto the tube</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transport.html#band-and-window-integrals">Band and window integrals</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="transport.html#escape-factor-of-a-uniform-cylinder-dsmc-side">Escape factor of a uniform cylinder (DSMC side)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="transport.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="instrument.html">Instrument model: reproducing a shock-tube measurement</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#what-the-spectrometer-sees">What the spectrometer sees</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#convolution-with-a-normalised-kernel">Convolution with a normalised kernel</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="instrument.html#discrete-convolution-on-the-computational-grid">Discrete convolution on the computational grid</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#instrument-line-shape-spectral-kernels">Instrument line shape (spectral kernels)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#spatial-resolution-and-the-camera-gate-smear">Spatial resolution and the camera gate smear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#band-spectral-window-radiance">Band (spectral-window) radiance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#shock-alignment">Shock alignment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#nonequilibrium-metric-and-measured-spectra">Nonequilibrium metric and measured spectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#units-of-the-quantities-compared-with-east">Units of the quantities compared with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#code-path">Code path</a></li>
+<li class="toctree-l3"><a class="reference internal" href="instrument.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="database.html">The spectroscopic database</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database.html#two-principles">Two principles</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="database.html#provenance-every-datum-is-referenced">Provenance: every datum is referenced</a></li>
+<li class="toctree-l4"><a class="reference internal" href="database.html#one-database-shared-with-dsmcfoam">One database shared with dsmcFoam</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#what-the-database-contains">What the database contains</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="database.html#atoms-and-atomic-ions">Atoms and atomic ions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="database.html#photoionisation-cross-sections">Photoionisation cross sections</a></li>
+<li class="toctree-l4"><a class="reference internal" href="database.html#diatomic-molecules">Diatomic molecules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="database.html#conventions-of-the-molecular-data">Conventions of the molecular data</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#data-provenance">Data provenance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#regenerating-the-database">Regenerating the database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#known-gaps">Known gaps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#references">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Library Classes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../classes/index.html">Library Classes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../classes/common.html">Common data classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/common.html#spectralgrid">spectralGrid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/common.html#radiationcellstate">radiationCellState</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/common.html#radiationlevels">radiationLevels</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/radiators.html">Radiating species</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/radiators.html#radiatingspecies-base-class">radiatingSpecies (base class)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/radiators.html#atomiclines">atomicLines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/radiators.html#diatomicbands">diatomicBands</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/populations.html">Population models</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/populations.html#radiationpopulationmodel-base-class">radiationPopulationModel (base class)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/populations.html#boltzmanntemperatures">boltzmannTemperatures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/populations.html#celldistribution">cellDistribution</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/line_shapes.html">Line-shape classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/line_shapes.html#lineshapemodel">lineShapeModel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/line_shapes.html#voigtwhitingoliverolongbothum">voigtWhitingOliveroLongbothum</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../classes/line_shapes.html#where-it-is-used">Where it is used</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/line_shapes.html#adding-a-line-shape">Adding a line shape</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/line_shapes.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/continuum.html">Continuum classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#continuumprocesses">continuumProcesses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#continuummodel">continuumModel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#boundfreephysical">boundFreePhysical</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#freefreephysical">freeFreePhysical</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#outputs">Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/continuum.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/transport.html">Transport classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/transport.html#radiationtransportmodel">radiationTransportModel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/transport.html#singlecell">singleCell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/transport.html#shocktube1d">shockTube1D</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/profiles.html">Profile classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/profiles.html#shocktubeprofile">shockTubeProfile</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../classes/profiles.html#source-macrofile">Source macroFile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/profiles.html#source-dsmccase">Source dsmcCase</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/profiles.html#shock-position">Shock position</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/profiles.html#member-functions">Member functions</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/instrument.html">Instrument classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#instrumentfunction-base-class">instrumentFunction (base class)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#gaussian">gaussian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#voigt">voigt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#tophat">topHat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#trapezoid">trapezoid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#tabulated">tabulated</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#composite">composite</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#eastlineshape">eastLineShape</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#shocktubeinstrument">shockTubeInstrument</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../classes/instrument.html#camera-keywords-read-by-shocktube1d">Camera keywords read by shockTube1D</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#test-radiationinstrument">Test-radiationInstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/instrument.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../classes/database.html">Database files and generators</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../classes/database.html#layout">Layout</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/database.html#atomic-format">Atomic format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/database.html#photoionisation-format">Photoionisation format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/database.html#molecular-format">Molecular format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../classes/database.html#generators">Generators</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../classes/database.html#build-atomic-nist-py"><code class="docutils literal notranslate"><span class="pre">build_atomic_nist.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/database.html#build-photoionisation-py"><code class="docutils literal notranslate"><span class="pre">build_photoionisation.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../classes/database.html#build-molecular-py"><code class="docutils literal notranslate"><span class="pre">build_molecular.py</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials and Examples</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Tutorials and Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/singleCell_N.html">singleCell_N: one cell of atomic nitrogen</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#physics-shown">Physics shown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#case-files">Case files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#plotting">Plotting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#expected-result">Expected result</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_N.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/singleCell_O.html">singleCell_O: one cell of atomic oxygen</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#physics-shown">Physics shown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#case-files">Case files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#expected-result">Expected result</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/singleCell_O.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/shockTube1D.html">shockTube1D: radiance along a 1-D post-shock profile</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#physics-shown">Physics shown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#the-profile">The profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#case-files">Case files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#plotting">Plotting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#expected-result">Expected result</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/shockTube1D.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/east_equilibrium.html">EAST equilibrium columns</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#physics-shown">Physics shown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#the-generator-make-cases-py">The generator: make_cases.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#one-case">One case</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#comparison-with-east">Comparison with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#expected-result">Expected result</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/east5029.html">EAST shot 50-29 on a dsmcFoam run</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#physics-shown">Physics shown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#input-expected-from-dsmcfoam">Input expected from dsmcFoam</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#case-files">Case files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/east5029.html#flags-values-not-published">FLAGS: values not published</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#comparison-with-east">Comparison with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/instrument_tests.html">Instrument model verification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#purpose">Purpose</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#how-the-comparison-is-made">How the comparison is made</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#the-tests">The tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#how-to-run">How to run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#output">Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#expected-result">Expected result</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/instrument_tests.html#references">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/about.html">About</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#what-radiationfoam-is">What radiationFoam is</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#relation-to-dsmcfoam">Relation to dsmcFoam+</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#author">Author</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#licence">Licence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#how-to-cite">How to cite</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/about.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/verification.html">Verification Record</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#how-the-verification-was-organised">How the verification was organised</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#atomic-lines-and-populations">Atomic lines and populations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#diatomic-bands">Diatomic bands</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#continuum">Continuum</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#transport-line-placement-and-populations-from-dsmc">Transport, line placement and populations from DSMC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#instrument">Instrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#restructure-and-review-gates">Restructure and review gates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#coupling-data-escape-factor">Coupling data (escape factor)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#comparison-with-experiment-east">Comparison with experiment (EAST)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/verification.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/bibliography.html">Bibliography</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #1f3b5a" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">radiationFoam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Theory Guide</a></li>
+      <li class="breadcrumb-item active">Line shapes and broadening</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/theory/line_shapes.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="line-shapes-and-broadening">
+<h1>Line shapes and broadening<a class="headerlink" href="#line-shapes-and-broadening" title="Link to this heading"></a></h1>
+<p>A bound-bound transition does not emit at one wavelength only. The
+emitters move (Doppler effect), the upper and lower levels have a finite
+lifetime (natural broadening), and the collisions with the neighbouring
+particles perturb the phase of the emitted wave train (pressure
+broadening: van der Waals, resonance, phase interruption and Stark
+broadening by the free electrons). The line therefore spreads over a
+small wavelength interval, described by a normalised <strong>line profile</strong>
+<span class="math notranslate nohighlight">\(\phi(\lambda)\)</span> [m<sup>-1</sup>],</p>
+<div class="math notranslate nohighlight">
+\[\int_0^\infty \phi(\lambda)\,\mathrm{d}\lambda = 1 .\]</div>
+<p>The bound-bound classes (<a class="reference internal" href="atomic_lines.html"><span class="doc">Atomic bound-bound lines</span></a>,
+<a class="reference internal" href="diatomic_bands.html"><span class="doc">Diatomic band systems, line by line</span></a>) compute the integrated emission
+<span class="math notranslate nohighlight">\(\varepsilon\)</span> [W m<sup>-3</sup> sr<sup>-1</sup>] and the integrated
+absorption <span class="math notranslate nohighlight">\(k\)</span> [m<sup>-1</sup> m] of every line; the spectral
+coefficients on the wavelength grid are then</p>
+<div class="math notranslate nohighlight">
+\[j_\lambda(\lambda_i) \mathrel{+}= \varepsilon\,\phi_i,
+\qquad
+\kappa_\lambda(\lambda_i) \mathrel{+}= k\,\phi_i ,\]</div>
+<p>where <span class="math notranslate nohighlight">\(\phi_i\)</span> is the profile value given to grid point
+<span class="math notranslate nohighlight">\(i\)</span>. This page explains how the code builds <span class="math notranslate nohighlight">\(\phi_i\)</span>: the
+widths of each broadening mechanism, how they combine into a Voigt
+profile, the approximation of the Voigt shape, its truncation, and its
+placement on the grid.</p>
+<p>Sources: <code class="docutils literal notranslate"><span class="pre">src/radiation/lineShapes</span></code> (<code class="docutils literal notranslate"><span class="pre">lineShapeModel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">voigtWhitingOliveroLongbothum</span></code>), the width computations in
+<code class="docutils literal notranslate"><span class="pre">src/radiation/radiators/derived/atomicLines/atomicLines.C</span></code> and
+<code class="docutils literal notranslate"><span class="pre">src/radiation/radiators/derived/diatomicBands/diatomicBands.C</span></code>.
+The classes are documented in <a class="reference internal" href="../classes/line_shapes.html"><span class="doc">Line-shape classes</span></a>.</p>
+<p>All widths below are <strong>full widths at half maximum</strong> (FWHM) in metres
+of wavelength. A width <span class="math notranslate nohighlight">\(\Delta\nu\)</span> in frequency converts to
+wavelength by <span class="math notranslate nohighlight">\(\Delta\lambda = \lambda_0^2\,\Delta\nu/c\)</span>; the code
+writes the factor <span class="math notranslate nohighlight">\(\lambda_0^2/c\)</span> once per line (<code class="docutils literal notranslate"><span class="pre">cWav</span></code>).</p>
+<section id="gaussian-and-lorentzian-profiles">
+<h2>Gaussian and Lorentzian profiles<a class="headerlink" href="#gaussian-and-lorentzian-profiles" title="Link to this heading"></a></h2>
+<p>Two shapes are the building blocks.</p>
+<ul>
+<li><p>A <strong>Gaussian</strong> of FWHM <span class="math notranslate nohighlight">\(w_D\)</span> describes the Doppler effect: an
+emitter moving with velocity component <span class="math notranslate nohighlight">\(u\)</span> towards the observer
+emits at <span class="math notranslate nohighlight">\(\lambda_0(1 - u/c)\)</span>, and a Maxwellian distribution of
+<span class="math notranslate nohighlight">\(u\)</span> gives a Gaussian distribution of wavelengths,</p>
+<div class="math notranslate nohighlight">
+\[\phi_G(\Delta\lambda) = \frac{2}{w_D}\sqrt{\frac{\ln 2}{\pi}}
+  \exp\!\left[-4\ln 2\left(\frac{\Delta\lambda}{w_D}\right)^{2}\right].\]</div>
+</li>
+<li><p>A <strong>Lorentzian</strong> of FWHM <span class="math notranslate nohighlight">\(w_L\)</span> describes the processes that
+limit the duration of the emitted wave train (finite lifetime,
+collisions). An exponentially damped wave train has the spectrum</p>
+<div class="math notranslate nohighlight">
+\[\phi_L(\Delta\lambda) = \frac{1}{\pi}\,
+  \frac{w_L/2}{\Delta\lambda^{2} + (w_L/2)^{2}} .\]</div>
+<p>The Lorentzian has wide wings, <span class="math notranslate nohighlight">\(\phi_L \propto
+\Delta\lambda^{-2}\)</span>; the Gaussian falls off much faster.</p>
+</li>
+</ul>
+<p>The Lorentzian mechanisms below are independent of each other, so their
+widths add: the convolution of two Lorentzians is a Lorentzian whose
+width is the sum of the two widths. The Doppler and Lorentz parts act
+together; the resulting profile is their convolution, the <strong>Voigt
+profile</strong> (section <a class="reference internal" href="#the-voigt-profile">The Voigt profile</a>).</p>
+</section>
+<section id="broadening-of-the-atomic-lines">
+<h2>Broadening of the atomic lines<a class="headerlink" href="#broadening-of-the-atomic-lines" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">atomicLines::addEmissionAbsorption</span></code> computes six widths per line and
+cell. The symbols are</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\lambda_0\)</span> [m]: the line centre;</p></li>
+<li><p><span class="math notranslate nohighlight">\(n\)</span>, <span class="math notranslate nohighlight">\(T\)</span>, <span class="math notranslate nohighlight">\(m\)</span>, <span class="math notranslate nohighlight">\(r\)</span>: number density
+[m<sup>-3</sup>], translational temperature [K], mass [kg] and
+hard-sphere radius [m] of the emitting species (entries <code class="docutils literal notranslate"><span class="pre">mass</span></code> and
+<code class="docutils literal notranslate"><span class="pre">radius</span></code> of the species, translational temperature of the cell
+state);</p></li>
+<li><p><span class="math notranslate nohighlight">\(n_j\)</span>, <span class="math notranslate nohighlight">\(T_j\)</span>, <span class="math notranslate nohighlight">\(m_j\)</span>, <span class="math notranslate nohighlight">\(r_j\)</span>: the same for every
+species <span class="math notranslate nohighlight">\(j\)</span> of the cell state;
+<span class="math notranslate nohighlight">\(n_\mathrm{tot} = \sum_j n_j\)</span>,
+<span class="math notranslate nohighlight">\(\rho = \sum_j n_j m_j\)</span>;</p></li>
+<li><p><span class="math notranslate nohighlight">\(n_e\)</span>, <span class="math notranslate nohighlight">\(T_e\)</span>: electron density and temperature of the cell
+state;</p></li>
+<li><p><span class="math notranslate nohighlight">\(A_{ul}\)</span> [s<sup>-1</sup>], <span class="math notranslate nohighlight">\(g_u\)</span>, <span class="math notranslate nohighlight">\(g_l\)</span>: the Einstein
+coefficient and the degeneracies given with the line in the transition
+file; <span class="math notranslate nohighlight">\(g(u)\)</span>, <span class="math notranslate nohighlight">\(g(l)\)</span> the degeneracies of the upper and
+lower levels; <span class="math notranslate nohighlight">\(n_l\)</span> the population of the lower level
+[m<sup>-3</sup>] from the population model (<a class="reference internal" href="populations.html"><span class="doc">Level populations</span></a>).</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The sums over <span class="math notranslate nohighlight">\(j\)</span> run over the species of the cell state, that
+is over the <strong>radiating species</strong> of the case (the <code class="docutils literal notranslate"><span class="pre">species</span></code>
+dictionary of <code class="docutils literal notranslate"><span class="pre">radiationProperties</span></code>). A gas component that is not
+declared as a radiating species is not a perturber of the pressure
+widths.</p>
+</div>
+<section id="doppler-width">
+<h3>Doppler width<a class="headerlink" href="#doppler-width" title="Link to this heading"></a></h3>
+<p>The FWHM of the Gaussian of a Maxwellian emitter at <span class="math notranslate nohighlight">\(T\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[w_D = \frac{\lambda_0}{c}\sqrt{\frac{8\,k\,T\,\ln 2}{m}} .\]</div>
+<p>The code writes <span class="math notranslate nohighlight">\(\ln 2\)</span> as 0.69315.</p>
+</section>
+<section id="natural-width">
+<h3>Natural width<a class="headerlink" href="#natural-width" title="Link to this heading"></a></h3>
+<p>A level <span class="math notranslate nohighlight">\(x\)</span> decays radiatively at the rate <span class="math notranslate nohighlight">\(\Gamma_x\)</span>; the
+line between two levels has a Lorentzian of angular-frequency FWHM
+<span class="math notranslate nohighlight">\(\Gamma_u + \Gamma_l\)</span>, i.e. a frequency FWHM
+<span class="math notranslate nohighlight">\((\Gamma_u + \Gamma_l)/(2\pi)\)</span> (Laux 1993, Eq. 4.19, p. 33):</p>
+<div class="math notranslate nohighlight">
+\[w_N = \frac{\lambda_0^{2}}{2\pi c}\,(\Gamma_u + \Gamma_l),
+\qquad
+\Gamma_x = \sum_{\text{lines leaving } x}
+  \frac{g_u^{\text{line}}}{g(x)}\,A .\]</div>
+<p>The weight <span class="math notranslate nohighlight">\(g_u^{\text{line}}/g(x)\)</span> handles the lumped levels of
+the database: when a level <span class="math notranslate nohighlight">\(x\)</span> groups several sublevels and a line
+starts from one of them only, its <span class="math notranslate nohighlight">\(A\)</span> counts for the share of the
+states of <span class="math notranslate nohighlight">\(x\)</span> that it leaves. <span class="math notranslate nohighlight">\(\Gamma_x\)</span> is thus the mean
+decay rate per state of the level. A ground level has
+<span class="math notranslate nohighlight">\(\Gamma = 0\)</span>.</p>
+</section>
+<section id="phase-interruption-impact-width">
+<h3>Phase-interruption (impact) width<a class="headerlink" href="#phase-interruption-impact-width" title="Link to this heading"></a></h3>
+<p>In the impact approximation every collision of the emitter interrupts
+the phase of the wave train. With the collision frequency
+<span class="math notranslate nohighlight">\(\nu_\mathrm{coll}\)</span> per emitter, the line is a Lorentzian of
+angular half width <span class="math notranslate nohighlight">\(\nu_\mathrm{coll}\)</span>, i.e. a frequency FWHM
+<span class="math notranslate nohighlight">\(\nu_\mathrm{coll}/\pi\)</span>. The code computes the hard-sphere
+collision rate per unit volume</p>
+<div class="math notranslate nohighlight">
+\[Z = \sum_j 2\,n\,n_j\,\pi (r + r_j)^{2}
+    \sqrt{\frac{2\,k\,T_m\,(m + m_j)}{\pi\,m\,m_j}},
+\qquad
+T_m = \frac{m\,n\,T + m_j\,n_j\,T_j}{m\,n + m_j\,n_j},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\sqrt{2kT_m(m+m_j)/(\pi m m_j)}\)</span> is half the mean relative
+speed <span class="math notranslate nohighlight">\(\bar g = \sqrt{8kT_m/(\pi\mu)}\)</span>, so that <span class="math notranslate nohighlight">\(Z/n =
+\sum_j n_j\,\sigma_j\,\bar g_j\)</span> is the collision frequency per emitter.
+The width is</p>
+<div class="math notranslate nohighlight">
+\[w_P = \frac{\lambda_0^{2}}{\pi c}\,\frac{Z}{n} .\]</div>
+</section>
+<section id="resonance-width">
+<h3>Resonance width<a class="headerlink" href="#resonance-width" title="Link to this heading"></a></h3>
+<p>An emitter colliding with an atom of its own kind in the lower level of
+the line interacts through the resonant dipole-dipole force. The code
+uses the transition’s own term of Griem (1964, p. 97), as written by
+Laux (1993, Eq. 4.20, p. 33), with the oscillator strength expressed
+through <span class="math notranslate nohighlight">\(A_{ul}\)</span>, and takes twice the half width of that formula:</p>
+<div class="math notranslate nohighlight">
+\[w_R = \frac{3}{16\pi^{3} c}\,
+      \sqrt{\frac{g_u}{g_l}}\,\lambda_0^{5}\,A_{ul}\,n_l ,
+\qquad n_l = \frac{g_l}{g(l)}\,n(l) .\]</div>
+<p>Laux’s formula is a half width at half maximum (his Eq. 4.20 is printed
+with the coefficient <span class="math notranslate nohighlight">\(3e^2/(16\pi^2\varepsilon_0 m_e c^2) =
+6.72\times10^{-16}\)</span> m), hence the factor 2. <span class="math notranslate nohighlight">\(n_l\)</span> is the number
+density of the line’s own lower level, of weight <span class="math notranslate nohighlight">\(g_l\)</span>: when the
+database lumps several levels into one level <span class="math notranslate nohighlight">\(l\)</span> of weight
+<span class="math notranslate nohighlight">\(g(l)\)</span> and population <span class="math notranslate nohighlight">\(n(l)\)</span>, the line sees the share
+<span class="math notranslate nohighlight">\(g_l/g(l)\)</span> (until 2026-11-16 the code used <span class="math notranslate nohighlight">\(n(l)\)</span>, which
+overestimated the width of lines with a lumped lower level by
+<span class="math notranslate nohighlight">\(g(l)/g_l\)</span>). The dsmcFoam escape factor (<code class="docutils literal notranslate"><span class="pre">spontaneousEmission</span></code>)
+uses the same full width since 2026-11-16.</p>
+</section>
+<section id="van-der-waals-width">
+<h3>van der Waals width<a class="headerlink" href="#van-der-waals-width" title="Link to this heading"></a></h3>
+<p>Collisions with all other particles through the induced-dipole force
+use an empirical form, with the mean speed written as
+<span class="math notranslate nohighlight">\((3kT/\bar m)^{1/2}\)</span>, <span class="math notranslate nohighlight">\(\bar m = \rho/n_\mathrm{tot}\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[w_\mathrm{vdW} = 20\,\frac{\lambda_0^{2}}{c}\;
+  4.5214\times10^{-18}\;n_\mathrm{tot}
+  \left(\frac{3\,k\,T\,n_\mathrm{tot}}{\rho}\right)^{0.3} .\]</div>
+<p>The numbers 20 and 4.5214e-18 are those of the verified version of the
+code (<code class="docutils literal notranslate"><span class="pre">docs/RADIATION_SPEC.md</span></code> section 3.1, a PARADE-type empirical
+form); the code gives no other source.</p>
+</section>
+<section id="stark-width">
+<h3>Stark width<a class="headerlink" href="#stark-width" title="Link to this heading"></a></h3>
+<p>The free electrons perturb the levels of the emitter through their
+electric field. For the neutral N and O lines this is the dominant
+pressure width in a shock layer. The code uses the electron-impact form
+of Johnston (2006, Eq. 3.13, p. 58): the half width at half maximum
+<span class="math notranslate nohighlight">\(\Delta\lambda_{S,0}\)</span> [Angstrom] at <span class="math notranslate nohighlight">\(T_e = 10^4\)</span> K and
+<span class="math notranslate nohighlight">\(n_e = 10^{16}\)</span> cm<sup>-3</sup> is scaled as</p>
+<div class="math notranslate nohighlight">
+\[\Delta\lambda_S = \Delta\lambda_{S,0}
+  \left(\frac{T_e}{10\,000\ \mathrm{K}}\right)^{n_S}
+  \frac{n_e}{10^{16}\ \mathrm{cm^{-3}}},\]</div>
+<p>and the full width in SI is</p>
+<div class="math notranslate nohighlight">
+\[w_S = 2\,n_e\,s\,\left(\frac{T_e}{10^{4}}\right)^{n_S}\,10^{-32}
+\quad [\mathrm{m}],\]</div>
+<p>with <span class="math notranslate nohighlight">\(s = \Delta\lambda_{S,0}\)</span> (column 7 of the atomic transition
+file, in Angstrom), <span class="math notranslate nohighlight">\(n_e\)</span> in m<sup>-3</sup>, and <span class="math notranslate nohighlight">\(n_S\)</span> the
+entry <code class="docutils literal notranslate"><span class="pre">starkExponent</span></code> of the species. Since <span class="math notranslate nohighlight">\(10^{16}\)</span>
+cm<sup>-3</sup> = <span class="math notranslate nohighlight">\(10^{22}\)</span> m<sup>-3</sup> and one Angstrom is
+<span class="math notranslate nohighlight">\(10^{-10}\)</span> m, the factor is <span class="math notranslate nohighlight">\(10^{-10}/10^{22} = 10^{-32}\)</span>.</p>
+<ul class="simple">
+<li><p><strong>Data.</strong> The values of <span class="math notranslate nohighlight">\(s\)</span> in <code class="docutils literal notranslate"><span class="pre">database/atoms/N_I.dat</span></code> and
+<code class="docutils literal notranslate"><span class="pre">O_I.dat</span></code> are Johnston’s tabulated <span class="math notranslate nohighlight">\(\Delta\lambda_{S,0}\)</span>
+(Appendix A, Tables A-1 to A-4), whose primary sources are Griem
+(1974), Wilson and Nicolet (1967) or Johnston’s least-squares fit
+(Eq. 3.16, p. 59); the data file keeps the table, page and source of
+each value (<code class="docutils literal notranslate"><span class="pre">database/SOURCES.md</span></code>, entry Johnston2006). Lines without
+a Johnston value, and every N II and O II line, carry
+<span class="math notranslate nohighlight">\(s = 0\)</span>: they have no Stark broadening.</p></li>
+<li><p><strong>Exponent.</strong> Johnston gives <span class="math notranslate nohighlight">\(n_S = 1/3\)</span> for most N and O lines
+(Park 1982, as quoted by Johnston); the tutorials use
+<code class="docutils literal notranslate"><span class="pre">starkExponent</span> <span class="pre">0.33</span></code>. The entry is required and applies to every
+line of the species.</p></li>
+<li><p><strong>Electron temperature.</strong> <span class="math notranslate nohighlight">\(T_e\)</span> is the electron temperature of
+the cell state; when the cell state gives none (<span class="math notranslate nohighlight">\(T_e \le 0\)</span>) the
+population model supplies one (<code class="docutils literal notranslate"><span class="pre">electronTemperature</span></code>, the
+temperature of the population model, see <a class="reference internal" href="populations.html"><span class="doc">Level populations</span></a>).
+<span class="math notranslate nohighlight">\(n_e = 0\)</span> gives <span class="math notranslate nohighlight">\(w_S = 0\)</span>.</p></li>
+</ul>
+</section>
+<section id="total-lorentz-width">
+<h3>Total Lorentz width<a class="headerlink" href="#total-lorentz-width" title="Link to this heading"></a></h3>
+<div class="math notranslate nohighlight">
+\[w_L = w_S + w_\mathrm{vdW} + w_N + w_P + w_R .\]</div>
+<p>Lines whose upper level lies above the bound limit <span class="math notranslate nohighlight">\(E_b\)</span> (the
+lowered ionisation limit of the population model) are skipped. A species
+with <span class="math notranslate nohighlight">\(n &lt; 10\)</span> m<sup>-3</sup> or <span class="math notranslate nohighlight">\(T &lt; 10\)</span> K contributes nothing.</p>
+</section>
+</section>
+<section id="broadening-of-the-diatomic-lines">
+<h2>Broadening of the diatomic lines<a class="headerlink" href="#broadening-of-the-diatomic-lines" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">diatomicBands</span></code> computes its widths once per <strong>vibrational transition</strong>
+(not per rotational line), at <span class="math notranslate nohighlight">\(\lambda_0 = 0.01/\bar\nu_0\)</span>, the
+band origin (<span class="math notranslate nohighlight">\(\bar\nu_0\)</span> in cm<sup>-1</sup>). With
+<span class="math notranslate nohighlight">\(M = m/\mathrm{amu}\)</span>, <span class="math notranslate nohighlight">\(n\)</span> and <span class="math notranslate nohighlight">\(T\)</span> the density and
+translational temperature of the radiator, the code evaluates
+(<code class="docutils literal notranslate"><span class="pre">diatomicBands.C</span></code>; forms kept from the verified version, class
+header items 11 and 12):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 82.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Width</p></th>
+<th class="head"><p>Expression in the code [m]</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Doppler</p></td>
+<td><p><span class="math notranslate nohighlight">\(w_G = 7.16\times10^{-7}\,\lambda_0\sqrt{T/M}\)</span>
+(<span class="math notranslate nohighlight">\(7.16\times10^{-7} = \sqrt{8k\ln 2/\mathrm{amu}}/c\)</span>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>self</p></td>
+<td><p><span class="math notranslate nohighlight">\(1.33\times10^{-29}\sqrt{2/M}\,\lambda_0^{2}\sqrt{T}\,n
+\times 10^{-6}\times 10\times 10^{10}\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p>foreign</p></td>
+<td><p><span class="math notranslate nohighlight">\(5.85\times10^{-30}\sqrt{1/M + 1/M_f}\,\lambda_0^{2}\sqrt{T}\,n_f
+\times 10^{-6}\times 10\times 10^{10}\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p>natural</p></td>
+<td><p><span class="math notranslate nohighlight">\(1.18\times10^{-14}\)</span> (a constant)</p></td>
+</tr>
+<tr class="row-even"><td><p>Stark</p></td>
+<td><p><span class="math notranslate nohighlight">\(10^{-8}\times 0.3\,(10^{-22}\max(n_e, 10^{-6}))^{0.6}\,
+\lambda_0^{2}\times 10^{10}\)</span> (no <span class="math notranslate nohighlight">\(T_e\)</span> dependence)</p></td>
+</tr>
+</tbody>
+</table>
+<p>with <span class="math notranslate nohighlight">\(p = \sum_j n_j k T_j + n_e k T_e\)</span>,
+<span class="math notranslate nohighlight">\(n_f = \max(p/(kT) - n,\ 10^{-40} p/(kT))\)</span> the foreign-gas density
+(<span class="math notranslate nohighlight">\(10^{10}\)</span> if <span class="math notranslate nohighlight">\(p \le 10^{-16}\)</span>), and <span class="math notranslate nohighlight">\(M_f\)</span> the
+foreign-gas molar mass. The cgs/Angstrom factors are carried verbatim.
+As documented in the class header (item 11), <span class="math notranslate nohighlight">\(M_f\)</span> is compared
+with its bounds in the wrong units, so it ends at 28.85 for any mixture
+and at 10 for a pure radiator. The Lorentz width is the sum of the four
+collision and radiative terms, and the Voigt width uses the simpler form</p>
+<div class="math notranslate nohighlight">
+\[w_V = \frac{w_L}{2} + \sqrt{\frac{w_L^{2}}{4} + w_G^{2}} .\]</div>
+<p>The shape, its table and its placement are those of the atomic lines
+(below); the table is built once per vibrational transition and shared
+by all its rotational lines.</p>
+</section>
+<section id="the-voigt-profile">
+<h2>The Voigt profile<a class="headerlink" href="#the-voigt-profile" title="Link to this heading"></a></h2>
+<p>The convolution of the Gaussian and the Lorentzian,</p>
+<div class="math notranslate nohighlight">
+\[\phi_V(\Delta\lambda) = \int_{-\infty}^{\infty}
+  \phi_G(\Delta\lambda')\,\phi_L(\Delta\lambda - \Delta\lambda')\,
+  \mathrm{d}\Delta\lambda' ,\]</div>
+<p>has no closed form. The code uses two empirical approximations, one for
+its width and one for its shape.</p>
+<section id="voigt-width-atomic-lines">
+<h3>Voigt width (atomic lines)<a class="headerlink" href="#voigt-width-atomic-lines" title="Link to this heading"></a></h3>
+<p>With <span class="math notranslate nohighlight">\(d = (w_L - w_D)/(w_L + w_D)\)</span>, the form of Liu et al. (2001):</p>
+<div class="math notranslate nohighlight">
+\[\beta = 0.023665\,e^{0.6\,d} + 0.00418\,e^{-1.9\,d},\]</div>
+<div class="math notranslate nohighlight">
+\[R = 1 - 0.18121\,(1 - d^{2}) - \beta\,\sin(\pi d),\]</div>
+<div class="math notranslate nohighlight">
+\[w_V = R\,(w_L + w_D) .\]</div>
+<p>The class name keeps Olivero and Longbothum (1977), whose width
+<span class="math notranslate nohighlight">\(w_V = 0.5346\,w_L + \sqrt{0.2166\,w_L^{2} + w_D^{2}}\)</span> the form
+above replaces; the two agree within 3e-4 (relative). Against the width
+of the Voigt profile computed by numerical convolution, the Liu et al.
+form is within 1.1e-4 over <span class="math notranslate nohighlight">\(10^{-3} \le w_L/w_D \le 10^{3}\)</span>, and
+the diatomic form <span class="math notranslate nohighlight">\(w_L/2 + \sqrt{w_L^2/4 + w_G^2}\)</span> within 1.2e-2
+(Figure 1b).</p>
+</section>
+<section id="whiting-shape">
+<h3>Whiting shape<a class="headerlink" href="#whiting-shape" title="Link to this heading"></a></h3>
+<p>With <span class="math notranslate nohighlight">\(a = w_L/w_V\)</span> and <span class="math notranslate nohighlight">\(x = |\lambda - \lambda_0|/w_V\)</span>,
+the shape of Whiting (1968) is</p>
+<div class="math notranslate nohighlight">
+\[\phi(x) = c_1\,e^{-2.772\,x^{2}}
+        + \frac{c_2}{1 + 4x^{2}}
+        + 0.016\,c_2\,(1 - a)\,
+          \exp\!\left(-0.4\,x^{2.25} - \frac{10}{10 + x^{2.25}}\right),\]</div>
+<div class="math notranslate nohighlight">
+\[c_0 = \frac{1}{(1.065 + 0.447\,a + 0.058\,a^{2})\,w_V},
+\qquad c_2 = a\,c_0,
+\qquad c_1 = c_0 - c_2 .\]</div>
+<p>The first term is a Gaussian of FWHM <span class="math notranslate nohighlight">\(w_V\)</span>
+(<span class="math notranslate nohighlight">\(2.772 \approx 4\ln 2\)</span>), the second a Lorentzian of FWHM
+<span class="math notranslate nohighlight">\(w_V\)</span>, mixed in the proportion <span class="math notranslate nohighlight">\(a\)</span>; <span class="math notranslate nohighlight">\(c_0\)</span> is the peak
+value that gives unit area. The third term is a small correction of the
+wings.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Whiting’s printed form of the correction is
+<span class="math notranslate nohighlight">\(\exp(-0.4x^{2.25}) - 10/(10 + x^{2.25})\)</span>; the code evaluates
+<span class="math notranslate nohighlight">\(\exp(-0.4x^{2.25} - 10/(10 + x^{2.25}))\)</span>, the form of the
+verified version (<code class="docutils literal notranslate"><span class="pre">docs/RADIATION_SPEC.md</span></code> 9.3.2). It acts only on
+the term of amplitude <span class="math notranslate nohighlight">\(0.016\,c_2(1 - a)\)</span>.</p>
+</div>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/line_shapes_voigt.png"><img alt="../_images/line_shapes_voigt.png" src="../_images/line_shapes_voigt.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Figure 1. (a) Normalised profile <span class="math notranslate nohighlight">\(w_V\phi\)</span> of the code (present:
+Whiting shape with the Liu et al. width) and the Voigt profile
+obtained by numerical convolution (baseline), for
+<span class="math notranslate nohighlight">\(w_L/w_D = 0, 1, 20\)</span>. (b) Voigt width over
+<span class="math notranslate nohighlight">\(w_L + w_D\)</span> against <span class="math notranslate nohighlight">\(d\)</span>. Script:
+<code class="docutils literal notranslate"><span class="pre">_static/figures/line_shapes/fig_line_shapes.py</span></code>.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="truncation-and-cumulative-table">
+<h2>Truncation and cumulative table<a class="headerlink" href="#truncation-and-cumulative-table" title="Link to this heading"></a></h2>
+<p>The profile is not evaluated at every grid point. For each line (atoms)
+or vibrational transition (molecules) the code builds the <strong>cumulative
+profile</strong></p>
+<div class="math notranslate nohighlight">
+\[C(\Delta\lambda) = \int_{-25 w_V}^{\Delta\lambda} \phi\,
+  \mathrm{d}\Delta\lambda'\]</div>
+<p>on 2001 points over <span class="math notranslate nohighlight">\(|\Delta\lambda| \le 25\,w_V\)</span>:</p>
+<ul class="simple">
+<li><p>the left half is a rectangle-rule sum from the far left wing, with the
+step <span class="math notranslate nohighlight">\(25\,w_V/1000\)</span>; the right half is the mirror image
+<span class="math notranslate nohighlight">\(C(+x) = 2C(0) - C(-x)\)</span>;</p></li>
+<li><p>the table is divided by its value at <span class="math notranslate nohighlight">\(+25\,w_V\)</span>, so the
+truncated profile has unit area: the line wings beyond
+<span class="math notranslate nohighlight">\(\pm 25\,w_V\)</span> are cut and their share is redistributed over the
+kept part. For a pure Lorentzian the share beyond
+<span class="math notranslate nohighlight">\(\pm 25\,w_V\)</span> is <span class="math notranslate nohighlight">\(1 - (2/\pi)\arctan 50 = 1.3\,\%\)</span>; for a
+Gaussian it is negligible;</p></li>
+<li><p>the table is read by linear interpolation with the step
+<span class="math notranslate nohighlight">\(25\,w_V/1001\)</span>, not the <span class="math notranslate nohighlight">\(25\,w_V/1000\)</span> it was built with
+(verified-version form, <code class="docutils literal notranslate"><span class="pre">docs/RADIATION_SPEC.md</span></code> 9.4.1): the
+profile used is the built one narrowed by the factor 1000/1001;</p></li>
+<li><p>outside the table <span class="math notranslate nohighlight">\(C = 0\)</span> (left) and <span class="math notranslate nohighlight">\(C = 1\)</span> (right).</p></li>
+</ul>
+<p>A coarser pre-selection skips an atomic line entirely when the interval
+<span class="math notranslate nohighlight">\(\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)\)</span> does not
+overlap the grid.</p>
+</section>
+<section id="placement-on-the-spectral-grid">
+<h2>Placement on the spectral grid<a class="headerlink" href="#placement-on-the-spectral-grid" title="Link to this heading"></a></h2>
+<p>The spectral grid (<a class="reference internal" href="../classes/common.html"><span class="doc">Common data classes</span></a>) has uniformly spaced points
+<span class="math notranslate nohighlight">\(\lambda_i = \lambda_\mathrm{min} + i\,\Delta\lambda\)</span>,
+<span class="math notranslate nohighlight">\(i = 0 \dots N-1\)</span>. Grid point <span class="math notranslate nohighlight">\(i\)</span> represents the <strong>bin</strong>
+<span class="math notranslate nohighlight">\((\lambda_{i-1}, \lambda_i]\)</span>, with
+<span class="math notranslate nohighlight">\(\lambda_{-1} = \lambda_\mathrm{min} - \Delta\lambda\)</span> for the
+first point, and receives the mean of the profile over its bin:</p>
+<div class="math notranslate nohighlight">
+\[\phi_i = \frac{C(\lambda_i - \lambda_0) - C(\lambda_{i-1} - \lambda_0)}
+              {\Delta\lambda} .\]</div>
+<p>The <strong>footprint</strong> of the line on the unbounded lattice
+<span class="math notranslate nohighlight">\(\lambda_\mathrm{min} + i\,\Delta\lambda\)</span> runs from the point
+<span class="math notranslate nohighlight">\(\lfloor(\lambda_0 - 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor\)</span>
+to the point
+<span class="math notranslate nohighlight">\(\lfloor(\lambda_0 + 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor + 1\)</span>,
+whose bin holds the right end of the footprint, and is intersected with
+the grid. The consequences are:</p>
+<ul class="simple">
+<li><p><strong>Conservation on any grid.</strong> The bin values telescope:
+<span class="math notranslate nohighlight">\(\sum_i \phi_i\,\Delta\lambda = C(+25w_V) - C(-25w_V) = 1\)</span> for a
+line inside the window, whatever the ratio of the line width to
+<span class="math notranslate nohighlight">\(\Delta\lambda\)</span>. A line narrower than one bin is placed in the
+bin that contains it, with its whole area; it is not lost between two
+grid points.</p></li>
+<li><p><strong>Window edges.</strong> A line cut by a window edge keeps only the bins
+inside the window; nothing is lumped onto the edge points. The window
+integral <span class="math notranslate nohighlight">\(\sum_i j_i\,\Delta\lambda\)</span> therefore covers
+<span class="math notranslate nohighlight">\((\lambda_\mathrm{min} - \Delta\lambda,\ \lambda_\mathrm{max}]\)</span>,
+and two adjacent windows on the same lattice (the second starting one
+<span class="math notranslate nohighlight">\(\Delta\lambda\)</span> above the end of the first) add up to the wide
+window.</p></li>
+<li><p><strong>Sign of the absorption.</strong> The emission is placed as
+<span class="math notranslate nohighlight">\(\max(0, \varepsilon)\,\phi_i\)</span>; the absorption <span class="math notranslate nohighlight">\(k\,\phi_i\)</span>
+keeps its sign, since <span class="math notranslate nohighlight">\(k\)</span> is net of stimulated emission and is
+negative for an inverted pair of levels (gain). The slab formula of
+<a class="reference internal" href="transport.html"><span class="doc">Radiative transfer</span></a> holds for either sign.</p></li>
+</ul>
+<p>The grid spacing still matters for the <strong>shape</strong> seen in the spectrum:
+with <span class="math notranslate nohighlight">\(\Delta\lambda\)</span> comparable to <span class="math notranslate nohighlight">\(w_V\)</span> a line appears as
+one or two bins. The integrated quantities (band radiance, window
+emission) are conserved, but a resolved spectrum needs
+<span class="math notranslate nohighlight">\(\Delta\lambda\)</span> well below the narrowest Doppler width of interest
+(for N I 868 nm at 10 000 K, <span class="math notranslate nohighlight">\(w_D \approx 2.35\times10^{-11}\)</span> m,
+<code class="docutils literal notranslate"><span class="pre">docs/RADIATION_SPEC.md</span></code> 3.1).</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Griem, H. R. (1964), cited through Laux (1993), Eq. 4.20 (resonance
+width); the full reference is not held in the repository.</p></li>
+<li><p>Griem, H. R. (1974). <em>Spectral Line Broadening by Plasmas</em>. Academic
+Press, New York and London.</p></li>
+<li><p>Johnston, C. O. (2006). <em>Nonequilibrium Shock-Layer Radiative Heating
+for Earth and Titan Entry</em>. PhD dissertation, Virginia Polytechnic
+Institute and State University, Blacksburg, VA.</p></li>
+<li><p>Laux, C. O. (1993). <em>Optical Diagnostics and Radiative Emission of Air
+Plasmas</em>. PhD thesis, Stanford University.</p></li>
+<li><p>Liu, Y., Lin, J., Huang, G., Guo, Y., Duan, C. (2001). Simple
+empirical analytical approximation to the Voigt profile. <em>Journal of
+the Optical Society of America B</em>, 18(5), 666.
+doi:10.1364/JOSAB.18.000666</p></li>
+<li><p>Olivero, J. J., Longbothum, R. L. (1977). Empirical fits to the Voigt
+line width: a brief review. <em>Journal of Quantitative Spectroscopy and
+Radiative Transfer</em>, 17(2), 233-236.
+doi:10.1016/0022-4073(77)90161-3</p></li>
+<li><p>Park, C. (1982), quoted by Johnston (2006) for the Stark exponent 1/3;
+the full reference is not held in the repository.</p></li>
+<li><p>Whiting, E. E. (1968). An empirical approximation to the Voigt
+profile. <em>Journal of Quantitative Spectroscopy and Radiative Transfer</em>,
+8(6), 1379-1384. doi:10.1016/0022-4073(68)90081-2</p></li>
+<li><p>Wilson, K. H., Nicolet, W. E. (1967). Spectral absorption coefficients
+of carbon, nitrogen, and oxygen atoms. <em>Journal of Quantitative
+Spectroscopy and Radiative Transfer</em>, 7, 891-941.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="diatomic_bands.html" class="btn btn-neutral float-left" title="Diatomic band systems, line by line" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="continuum.html" class="btn btn-neutral float-right" title="Continuum radiation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026-2026, Clement Civrais.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

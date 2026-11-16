@@ -1,0 +1,295 @@
+Spectral quantities and conventions
+===================================
+
+This page fixes the quantities every other theory page uses: the
+wavelength grid, the units, the emission and absorption coefficients,
+the source function and the radiative transfer equation along a ray. It
+ends with a map from each piece of physics to the library directory that
+implements it, the place to start reading the code.
+
+All of it lives in one library, ``libradiationFoam``
+(``src/radiation``). The application ``radiationFoam``
+(``applications/solvers/radiationFoam``) only builds the radiating
+species, the population model and the continuum, selects a transport
+mode and runs it.
+
+Wavelength grid
+---------------
+
+Spectra are computed on a uniform grid of vacuum wavelengths,
+``spectralGrid`` (``src/radiation/common/spectralGrid``):
+
+.. math::
+
+   \lambda_i = \lambda_{\min} + i\,\Delta\lambda,
+   \qquad i = 0, \dots, N-1,
+
+.. math::
+
+   \Delta\lambda = \frac{\lambda_{\max} - \lambda_{\min}}{N - 1},
+
+where :math:`\lambda_{\min}` and :math:`\lambda_{\max}` are the entries
+``minWavelength`` and ``maxWavelength`` (given in nm, stored in m) and
+:math:`N` is ``nPoints``. The constructor stops if
+:math:`\lambda_{\max} \le \lambda_{\min}` or :math:`N < 100`.
+
+.. code-block:: cpp
+
+   spectralGrid
+   {
+       minWavelength   867.9;   // [nm]
+       maxWavelength   869.2;   // [nm]
+       nPoints         1000;    // [-], >= 100
+   }
+
+The singleCell mode reads one such grid; shockTube1D reads one per
+spectral window (sub-dictionaries of ``windows``), see
+:doc:`/theory/transport`.
+
+Each grid point stands for a bin. The bin of point :math:`i` is
+:math:`(\lambda_{i-1}, \lambda_i]` (with
+:math:`\lambda_{-1} = \lambda_{\min} - \Delta\lambda`), and the value a
+line gives to point :math:`i` is the integral of its profile over that bin
+divided by :math:`\Delta\lambda`. A line inside the window therefore
+integrates to exactly one on any grid, however narrow it is
+(``src/radiation/radiators/basic/radiatingSpecies/radiatingSpecies.H``;
+details in :doc:`/theory/line_shapes`).
+
+Wavelengths and wavenumbers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All wavelengths are **vacuum** wavelengths; no air conversion is made
+anywhere. Atomic line positions are read in Ångström from the database
+and stored in metres (:math:`\times 10^{-10}`). Molecular line positions
+are computed as wavenumbers :math:`\tilde\nu` in cm\ :sup:`-1` from term
+values and placed at
+
+.. math::
+
+   \lambda = \frac{1}{100\,\tilde\nu} \quad [\mathrm{m}],
+   \qquad \tilde\nu\ \text{in cm}^{-1}.
+
+Energies in the data files are in cm\ :sup:`-1` and are converted to
+joules by :math:`E = 100\,h c\,\tilde E`.
+
+Physical constants
+~~~~~~~~~~~~~~~~~~
+
+The radiators and population models carry their own constants, the exact
+SI 2019 values (OpenFOAM's ``DimensionedConstants`` hold six digits
+only): :math:`k_B = 1.380649\times10^{-23}` J K\ :sup:`-1`,
+:math:`h = 6.62607015\times10^{-34}` J s, :math:`c = 299792458` m s\ :sup:`-1`,
+:math:`e = 1.602176634\times10^{-19}` C, and in ``diatomicBands`` the
+CODATA 2018 atomic mass unit :math:`1.66053906660\times10^{-27}` kg.
+
+Emission and absorption coefficients
+------------------------------------
+
+Every radiator adds two spectral fields on the grid
+(``radiatingSpecies::addEmissionAbsorption``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 20 58
+
+   * - Quantity
+     - Units
+     - Meaning
+   * - :math:`j_\lambda`
+     - W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`
+     - spontaneous emission coefficient: power emitted per unit volume,
+       solid angle and wavelength
+   * - :math:`\kappa_\lambda`
+     - m\ :sup:`-1`
+     - absorption coefficient, **net of stimulated emission**
+   * - :math:`I_\lambda`
+     - W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1`
+     - spectral radiance (specific intensity)
+   * - :math:`\int I_\lambda\,d\lambda`
+     - W m\ :sup:`-2` sr\ :sup:`-1`
+     - band-integrated radiance (``bands.csv`` of shockTube1D)
+   * - :math:`4\pi\int j_\lambda\,d\lambda`
+     - W m\ :sup:`-3`
+     - emitted power per unit volume (``profile.csv`` of shockTube1D)
+
+Both coefficients are **per unit wavelength**. The :math:`4\pi` appears
+only in volumetric totals. The coefficients of the species and of the
+continuum processes are summed:
+
+.. math::
+
+   j_\lambda = \sum_s j_{\lambda,s} + j_\lambda^{\mathrm{cont}},
+   \qquad
+   \kappa_\lambda = \sum_s \kappa_{\lambda,s} + \kappa_\lambda^{\mathrm{cont}}.
+
+A bound-bound line :math:`u \to l` contributes a line-integrated
+coefficient times a normalised profile :math:`\phi_\lambda`
+(:math:`\int\phi_\lambda\,d\lambda = 1`, units m\ :sup:`-1`):
+
+.. math::
+
+   j_\lambda = \epsilon_{ul}\,\phi_\lambda(\lambda - \lambda_0),
+   \qquad
+   \kappa_\lambda = k_{ul}\,\phi_\lambda(\lambda - \lambda_0),
+
+with
+
+.. math::
+
+   \epsilon_{ul} = \frac{h c}{4\pi\lambda_0}\,n_u A_{ul}
+   \quad [\mathrm{W\,m^{-3}\,sr^{-1}}],
+
+.. math::
+
+   k_{ul} = \frac{\lambda_0^4}{8\pi c}\,A_{ul}\,g_u
+            \left(\frac{n_l}{g_l} - \frac{n_u}{g_u}\right)
+   \quad [\mathrm{m^{-1}\,m}].
+
+Here :math:`n_u, n_l` are the level number densities (m\ :sup:`-3`),
+:math:`g_u, g_l` their statistical weights and :math:`A_{ul}` the
+Einstein coefficient for spontaneous emission (s\ :sup:`-1`). The second
+term of :math:`k_{ul}` is stimulated emission. When the pair of levels is
+inverted (:math:`n_u/g_u > n_l/g_l`), :math:`k_{ul} < 0`: the line is a
+gain, and the code keeps the negative value. The atomic forms are in
+:doc:`/theory/atomic_lines`, the molecular ones (written with band
+strengths and Hoenl-London factors) in :doc:`/theory/diatomic_bands`.
+
+Source function
+---------------
+
+The source function is the ratio
+
+.. math::
+
+   S_\lambda = \frac{j_\lambda}{\kappa_\lambda}.
+
+For a single line, the two expressions above give
+
+.. math::
+
+   S_\lambda
+     = \frac{2 h c^2}{\lambda^5}\,
+       \frac{1}{\dfrac{n_l\,g_u}{n_u\,g_l} - 1},
+
+which depends on the populations only through the ratio of the two
+levels. When the two levels are in Boltzmann equilibrium at a temperature
+:math:`T`, :math:`n_l g_u/(n_u g_l) = \exp(hc/\lambda k_B T)` and
+:math:`S_\lambda` becomes the Planck function
+
+.. math::
+
+   B_\lambda(T) = \frac{2 h c^2}{\lambda^5}\,
+                  \frac{1}{\exp\!\left(\dfrac{hc}{\lambda k_B T}\right) - 1},
+
+i.e. Kirchhoff's law :math:`j_\lambda = \kappa_\lambda B_\lambda`. Out of
+equilibrium the code never assumes this relation: :math:`j_\lambda` and
+:math:`\kappa_\lambda` are computed separately from the upper and lower
+populations of each line, whatever their origin
+(:doc:`/theory/populations`). The source function is then the generalised
+Kirchhoff form above, line by line.
+
+Radiative transfer equation
+---------------------------
+
+Along a ray of path length :math:`s` the radiance obeys
+
+.. math::
+
+   \frac{dI_\lambda}{ds} = j_\lambda(s) - \kappa_\lambda(s)\,I_\lambda(s).
+
+Scattering is not modelled. With the optical depth
+:math:`\tau_\lambda(s) = \int_0^s \kappa_\lambda\,ds'`, the formal
+solution for a ray entering with :math:`I_\lambda(0)` is
+
+.. math::
+
+   I_\lambda(s) = I_\lambda(0)\,e^{-\tau_\lambda(s)}
+     + \int_0^s j_\lambda(s')\,
+       e^{-[\tau_\lambda(s) - \tau_\lambda(s')]}\,ds'.
+
+For a uniform slab of thickness :math:`D` and no incoming radiance, this
+reduces to
+
+.. math::
+
+   I_\lambda = S_\lambda\left(1 - e^{-\kappa_\lambda D}\right)
+             = -\frac{j_\lambda}{\kappa_\lambda}\,
+               \mathrm{expm1}(-\kappa_\lambda D),
+
+with the optically thin limit :math:`I_\lambda = j_\lambda D` when
+:math:`\kappa_\lambda D \ll 1`. This is the form the shockTube1D mode
+evaluates for each cell of a shock-tube profile (it uses ``expm1`` so the
+thin limit is exact to round-off, and it holds for either sign of
+:math:`\kappa_\lambda`); see :doc:`/theory/transport`. The instrument
+model that turns this radiance into what a spectrometer records is in
+:doc:`/theory/instrument`.
+
+Map: physics to library directory
+---------------------------------
+
+A student who wants to see how a piece of physics is coded can start from
+this table. All paths are under ``src/radiation/``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 32 38
+
+   * - Physics
+     - Directory (classes)
+     - Theory / classes pages
+   * - Wavelength grid, bins
+     - ``common/spectralGrid`` (``spectralGrid``)
+     - this page, :doc:`/classes/common`
+   * - State of one cell (n, T, n\ :sub:`e`, T\ :sub:`e`, level
+       distribution)
+     - ``common/radiationCellState`` (``radiationCellState``)
+     - :doc:`/theory/populations`, :doc:`/classes/common`
+   * - Spectroscopic levels a radiator needs
+     - ``common/radiationLevels`` (``radiationLevels``)
+     - :doc:`/theory/populations`, :doc:`/classes/common`
+   * - Level populations from temperatures or from the DSMC
+       distribution
+     - ``populations/`` (``radiationPopulationModel``,
+       ``boltzmannTemperatures``, ``cellDistribution``)
+     - :doc:`/theory/populations`, :doc:`/classes/populations`
+   * - Atomic bound-bound lines
+     - ``radiators/derived/atomicLines``
+     - :doc:`/theory/atomic_lines`, :doc:`/classes/radiators`
+   * - Diatomic band systems, line by line
+     - ``radiators/derived/diatomicBands``
+     - :doc:`/theory/diatomic_bands`, :doc:`/classes/radiators`
+   * - Line broadening and the Voigt profile
+     - ``lineShapes/`` (``voigtWhitingOliveroLongbothum``)
+     - :doc:`/theory/line_shapes`, :doc:`/classes/line_shapes`
+   * - Bound-free and free-free continuum
+     - ``continuum/`` (``boundFreePhysical``, ``freeFreePhysical``)
+     - :doc:`/theory/continuum`, :doc:`/classes/continuum`
+   * - Radiative transfer (single cell, 1-D shock tube)
+     - ``transport/`` (``singleCell``, ``shockTube1D``)
+     - :doc:`/theory/transport`, :doc:`/classes/transport`
+   * - Cell states of a 1-D profile
+     - ``profiles/shockTubeProfile``
+     - :doc:`/classes/profiles`
+   * - Spectrometer (instrument line shape, spatial response)
+     - ``instrument/``
+     - :doc:`/theory/instrument`, :doc:`/classes/instrument`
+   * - Spectroscopic data and their sources
+     - ``database/`` (data files, generators in ``database/sources``)
+     - :doc:`/theory/database`, :doc:`/classes/database`
+
+The data flow of one run is: the species are built once (levels and line
+lists, ``radiators/``); for every cell, the population model gives the
+number density of every level (``populations/``); each radiator adds its
+:math:`j_\lambda`, :math:`\kappa_\lambda` with the line profiles
+(``lineShapes/``), the continuum adds its own (``continuum/``); the
+transport mode turns the coefficients into radiance (``transport/``) and,
+optionally, into a simulated measurement (``instrument/``).
+
+References
+----------
+
+* Beyer, J., Pfeiffer, M. and Fasoulas, S. (2022). Non-equilibrium
+  radiation modeling in a gas kinetic simulation code. *Journal of
+  Quantitative Spectroscopy and Radiative Transfer* 280, 108083.
+  DOI 10.1016/j.jqsrt.2022.108083. (Past verification reference of the
+  coefficient formulas.)

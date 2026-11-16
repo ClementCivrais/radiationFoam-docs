@@ -1,0 +1,286 @@
+Verification Record
+===================
+
+The present page records the verification of radiationFoam as it is
+written in the repository: the commit messages and the specifications in
+``docs/``. Every result below is quoted from the commit given in the first
+column (short hash of the radiationFoam repository, ``git show <hash>``).
+The code was developed in the DSMC_Rovibronic repository and moved here
+with its history on 2026-11-16 (commit ``83fd476``); the dated reports
+named in the commit messages (``run/RAD/...``) are kept in that
+repository.
+
+Verification means comparison with an analytic result, an independent
+transcription of the same formulas, or another code solving the same
+equations. Comparisons with experiment (EAST) are listed separately at the
+end.
+
+How the verification was organised
+-----------------------------------
+
+The library was first written as a transcription of the radiation module
+of the PICLas code, and every routine was checked against PICLas reference
+outputs, to round-off where the same constants were used (phases 1a-2e,
+2026-11-14). On 2026-11-14 the replica options were removed by user
+decision and only the corrected physics was kept (commit ``9ea3d42``;
+``docs/RADIATION_RESTRUCTURE.md`` section 6). From then on, every change
+has been gated by md5 identity of the regression outputs, the instrument
+test suite and independent Python references. PICLas appears below only as
+the past verification reference.
+
+Atomic lines and populations
+----------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``bd465a5``
+     - Phase 1a. Atomic lines (``atomicLines``, Voigt line shape) and the
+       ``singleCell`` mode, against the PICLas single-cell N and O
+       references: maximum relative error 4.5e-6 (tolerance 1e-5); the
+       residual is the SI-2019 constants.
+   * - ``99d6fea``
+     - ``RADIATION_SPEC.md`` written (the equations with file and line
+       references, the regression-case conditions, a list of
+       inconsistencies), with an independent Python baseline of the atomic
+       path that reproduces the single-cell references to 2e-10.
+   * - ``33ec715``
+     - Phase 1b. The population models ``boltzmannTemperatures`` and
+       ``cellDistribution``: single-cell N and O bit-identical after the
+       refactoring, the distribution test exact. Referenced atomic
+       database (NIST ASD v5.12, Johnston 2006 Stark widths).
+   * - ``be594a5``
+     - Library review. Atomic level cut also without electrons: with
+       :math:`n_e=0` the autoionising levels above the ionisation limit
+       were in the partition function and populated (O I 0.9 % and 4.7 %
+       of the atoms at 20 and 25 kK); after the fix the populations agree
+       with a Boltzmann distribution over the bound levels to 1e-14, in
+       both ``boltzmannTemperatures`` and ``cellDistribution``
+       ``boltzmannFill``. A distribution ``g`` list of the wrong length is
+       now fatal (it was dropped silently).
+   * - ``3153f7a``
+     - Library review, round 2 (R3): natural, phase and resonance widths of
+       the atomic lines from their sources (natural and resonance widths as
+       written by Laux 1993, Eqs. 4.19-4.20; phase width from impact
+       theory). Open item 1 of the continuum (Johnston
+       nitrogen slab) settled: no defect.
+
+Diatomic bands
+--------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``07f72a1``
+     - Phase 1c. ``diatomicBands`` and the diatomic Boltzmann
+       re-expansion, N2 against the PICLas references (8 isolated band
+       systems, full windows at 10 kK and in nonequilibrium, 8 synthetic
+       transition-type cases): 2.0e-6 point-wise, band integrals
+       :math:`\leq` 1.2e-6, 2.3e-9 with the PICLas constants.
+   * - ``946d53d``
+     - Referenced molecular database (N2 1P/2P, N2+ first negative and
+       Meinel, NO gamma/beta/delta, O2 Schumann-Runge from the Laher-Espy
+       IPAC tables): strong bands within 0.3 % in A of Gilmore et al.
+       (1992). Single-cell 10000 K N2: 2P 1.012 and 1P 1.22 times the
+       PARADE file (the Laux 1P A values are about 19 % lower than
+       Gilmore's).
+   * - ``14f8cab``
+     - N2+ two-band file (first negative and Meinel) against PICLas:
+       2.1e-6; 623 outputs md5-identical after the continuum hooks.
+   * - ``168cb0b``
+     - N2 VUV band systems (Birge-Hopfield I and II, Lyman-Birge-Hopfield,
+       Carroll-Yoshino, Worley-Jenkins, Worley) from the PARADE N2 file:
+       V1 generated file against the source file read directly,
+       bit-identical once four named conventions are applied; V2 the 1P
+       spectra change only by the partition-function factor; V3 EAST
+       equilibrium Deep VUV +0.15 to +0.85 %, 170-180 nm +0.01 to
+       +0.25 %.
+   * - ``6ccb31f``
+     - N2 VUV transition moments converted to the degeneracy-summed
+       convention (x2 for the Pi-Sigma systems); evidence: LBH 0.500 times
+       Gilmore (1992).
+   * - ``ade893c``
+     - The doubled PARADE VUV columns written exactly (16326 values
+       checked against decimal doubling; 4806 rows of ``N2.dat`` change
+       by :math:`\leq` 4.8e-5).
+   * - ``e9083b9``
+     - NO epsilon, beta prime and gamma prime systems from Laux (1993)
+       App. H (two independent transcriptions, 0 of 3440 cells differ).
+       V1 radiationFoam against a Python line sum from the tables:
+       :math:`|\Delta|\leq` 7.5e-9; V2 existing NO bands scale exactly by
+       the partition-function ratio; V3 EAST equilibrium VUV 170-180 nm
+       +0.02 to +1.1 %.
+   * - ``3153f7a``
+     - Library review, round 2 (R2): Hönl-London factors of the
+       transition types 3, 5, 6 and the type-4 strengths by the matrix
+       method in the Hund's case (a) basis. Per-level sum rule of all 17
+       bands 0.977-1.017 (was 0.48-1.22); per line :math:`\leq` 4.7e-4
+       against an independent Python reference (was up to 0.67).
+
+Continuum
+---------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``39507df``
+     - ``boundFreePhysical`` and ``freeFreePhysical`` (Kramers
+       hydrogenic or Johnston 2006 App. B cross sections, Milne relation):
+       :math:`j/(\kappa B)=1` within 1.5e-14 in local thermodynamic
+       equilibrium; hydrogen Kramers 1.6e-15. The PICLas continuum
+       routines (since removed) matched the unmodified Fortran to 3.3e-15
+       over 10 cases. Open at the time: Johnston nitrogen slab 62.7 against
+       80 W cm\ :sup:`-2` (-22 %, below 2 eV); settled as no defect in
+       ``3153f7a``.
+
+Transport, line placement and populations from DSMC
+---------------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``9b1ce0c``
+     - Phase 2a. ``shockTube1D`` (tangent slab across the tube) with three
+       cell-state routes (macro file, dsmcFoam case fields, distribution
+       files): against PICLas on an 85-cell synthetic profile, round-off
+       with the PICLas constants, integrals :math:`\leq` 1.13e-6 with
+       SI-2019; the dsmcFoam route bit-identical to the macro-file route.
+   * - ``93cfe41``
+     - Phase 2d. ``missingLevels boltzmannFill``: with all levels present,
+       md5-identical to ``zero`` (N, N2 1P/2P/VUV); with levels removed and
+       filled, bit-identical to the full Boltzmann case (N 159 levels, N2
+       34714 levels).
+   * - ``76c283f``
+     - Phase 2e. Exact bin integration at the window edges: adjacent
+       windows tile to 1e-12; the former left-edge lumping changed window
+       integrals by up to -37 % in a 1 nm band at a window edge. The exact
+       form is the only one since ``9ea3d42``.
+   * - ``856a272``
+     - Code review: six defects fixed with reproducers (among them the
+       weight split of the DSMC Rydberg shells, x2.8-22.5 too high; the
+       distribution writer's volume of cut cells; the shock-front
+       ``maxGradient`` criterion, 2 mm off); all exact outputs
+       md5-identical, all suites pass.
+
+Instrument
+----------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``cb83c59``
+     - Phase 2b. The EAST measurement model: 47 checks pass; integrals
+       conserved to 2.8e-16, Gaussian x Gaussian 1e-13, top-hat x Gaussian
+       6e-6. Finding: the square-root Voigt wings of the EAST line shape
+       diverge, a cutoff is mandatory.
+   * - ``9860e85``
+     - Phase 2c. The instrument wired into ``shockTube1D``: raw outputs
+       md5-unchanged; 88 of 88 checks against the standalone instrument
+       path and a Python transcription.
+   * - ``9ea3d42``
+     - After the removal of the two slit tests with the replica instrument
+       function: 45 of 45 checks, 21 outputs identical (gate G3).
+   * - ``0c92404``
+     - The suite as the tutorial ``tutorials/instrumentTests`` (45 checks).
+
+Restructure and review gates
+----------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``9ea3d42``
+     - Restructure step 2 and removal of the replica options. G1 every
+       ``postProcessing`` file md5-identical (old build with the corrected
+       options set explicitly, new build without them, the radiation
+       database in place of the PICLas data files); G2 nine dsmcFoam decks
+       and three table-lookup variants identical; G3 45 of 45, 21 outputs
+       identical; G4 11 of 11 removed entries fatal; G5 only fallback code,
+       path maps and dated reports name the old paths; G6 clean build, no
+       warning.
+   * - ``be594a5``
+     - Library review: G1 413 cases, 1312 ``postProcessing`` files
+       md5-identical old against new; G3 45/45 and 21 outputs identical; G4
+       0 warnings; G5 EAST equilibrium outputs identical.
+   * - ``3153f7a``
+     - Library review, round 2: G1 old against intermediate identical
+       except ``east5029`` (+0.15 % UV/Vis, from the line gain kept below
+       zero); R2 alone changes exactly the 51 cases with a
+       ``diatomicBands`` radiator, R3 alone exactly the 68 with an
+       ``atomicLines`` radiator; G3 45/45, outputs identical; G4 0
+       warnings.
+
+Coupling data (escape factor)
+-----------------------------
+
+The cylinder escape probability tabulated for the DSMC-side
+``spontaneousEmission`` (:doc:`/guide/dsmcfoam_coupling`):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``5982c26``
+     - The wall layer resolved in the mean escape probability of the
+       uniform cylinder: the table against the reference quadrature was
+       0.289-1.000 before and is 0.99998-1.00007 after; Monte Carlo of
+       2e7 photon paths within 2 sigma.
+   * - ``58caf48``
+     - Escape-factor numbers refreshed: closed-box and C7 checks rerun,
+       C7 table against quadrature 3.3e-4 (was 1.07e-3).
+
+Comparison with experiment (EAST)
+---------------------------------
+
+These are validation numbers (comparison with shock-tube measurements,
+Brandis and Cruden 2017), recorded with the changes that moved them. The
+ratios are present/EAST band radiances of the equilibrium cases
+(``tutorials/EAST/equilibrium``, variant ``full``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 11 89
+
+   * - Commit
+     - Result
+   * - ``3153f7a``
+     - Deep VUV 0.618 → 0.613, VUV 1.154 → 1.124, UV/Vis 0.596, Vis/NIR
+       1.056 → 1.049, IR 0.952 → 0.951.
+
+References
+----------
+
+* Brandis, A. M. and Cruden, B. A. (2017). Benchmark shock tube
+  experiments of radiative heating relevant to Earth re-entry. 55th AIAA
+  Aerospace Sciences Meeting, AIAA Paper 2017-1145.
+  doi:10.2514/6.2017-1145.
+* Gilmore, F. R., Laher, R. R. and Espy, P. J. (1992). Franck-Condon
+  factors, r-centroids, electronic transition moments, and Einstein
+  coefficients for many nitrogen and oxygen band systems. Journal of
+  Physical and Chemical Reference Data, 21(5), 1005-1107.
+  doi:10.1063/1.555910.
+* Johnston, C. O. (2006). Nonequilibrium shock-layer radiative heating for
+  Earth and Titan entry. PhD thesis, Virginia Polytechnic Institute and
+  State University.
+* Laux, C. O. (1993). Optical diagnostics and radiative emission of air
+  plasmas. PhD thesis, Stanford University.

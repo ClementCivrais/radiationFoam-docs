@@ -1,0 +1,251 @@
+Radiative transfer
+==================
+
+The radiators (:doc:`/theory/atomic_lines`,
+:doc:`/theory/diatomic_bands`, :doc:`/theory/continuum`) give, in each
+cell, the spectral emission coefficient :math:`j_\lambda`
+[W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and the spectral absorption
+coefficient :math:`\kappa_\lambda` [m\ :sup:`-1`], summed over all
+species and processes. The **transport model** turns these local
+coefficients into the quantity that is measured or that leaves the gas:
+a spectral radiance :math:`I_\lambda`
+[W m\ :sup:`-2` sr\ :sup:`-1` m\ :sup:`-1`].
+
+radiationFoam has two transport models, selected by the entry ``mode``
+of ``system/radiationProperties``
+(``src/radiation/transport``, :doc:`/classes/transport`):
+
+* ``singleCell``: one cell, no transfer;
+* ``shockTube1D``: the cells of a 1-D shock-tube profile, each a uniform
+  slab across the tube.
+
+The application ``radiationFoam``
+(``applications/solvers/radiationFoam/radiationFoam.C``) builds the
+radiating species, the population model and the continuum processes,
+selects the transport model by ``mode`` and calls its ``solve()``. It
+runs in serial (``argList::noParallel``).
+
+The radiative transfer equation
+-------------------------------
+
+Along a ray of direction :math:`\mathbf{s}`, a beam gains energy by
+emission and loses energy by absorption:
+
+.. math::
+
+   \frac{\mathrm{d}I_\lambda}{\mathrm{d}s} = j_\lambda - \kappa_\lambda\,I_\lambda .
+
+Scattering is neglected (a good approximation for a gas). Here
+:math:`\kappa_\lambda` is **net of stimulated emission**: the induced
+emission, proportional to :math:`I_\lambda` like the absorption, is
+counted as a negative absorption. In a medium of uniform :math:`j` and
+:math:`\kappa`, the ratio :math:`S_\lambda = j_\lambda/\kappa_\lambda`
+is the source function; in local thermodynamic equilibrium it is the
+Planck function :math:`B_\lambda(T)`.
+
+Uniform slab
+~~~~~~~~~~~~
+
+For a uniform layer of thickness :math:`D` with no radiation entering
+it (:math:`I_\lambda = 0` at :math:`s = 0`), the equation integrates to
+
+.. math::
+
+   I_\lambda(D) = \frac{j_\lambda}{\kappa_\lambda}
+     \left(1 - e^{-\kappa_\lambda D}\right)
+   = -\frac{j_\lambda}{\kappa_\lambda}\,
+     \mathrm{expm1}(-\kappa_\lambda D) .
+
+Its two limits, with the optical thickness :math:`\tau = \kappa_\lambda D`:
+
+* **optically thin**, :math:`\tau \ll 1`: :math:`I_\lambda \to j_\lambda D`.
+  Every photon emitted in the layer reaches the observer;
+* **optically thick**, :math:`\tau \gg 1`: :math:`I_\lambda \to
+  j_\lambda/\kappa_\lambda`. The observer sees only the last
+  :math:`1/\kappa_\lambda` of the layer, and in equilibrium the radiance
+  saturates at the black body :math:`B_\lambda(T)`.
+
+The code evaluates the slab formula with ``std::expm1``. For small
+:math:`\tau` the naive form :math:`1 - e^{-\tau}` loses its digits to
+round-off (relative error 2e-5 at :math:`\tau = 10^{-12}`, 11 % at
+:math:`10^{-16}`, by the script below), while ``-expm1(-tau)`` is
+accurate to round-off for every :math:`\tau > 0`. :math:`\kappa = 0`
+exactly gives :math:`I = jD`. A negative :math:`\kappa` (gain, an
+inverted pair of levels) is kept: the same formula then gives
+:math:`I = (j/|\kappa|)(e^{|\kappa|D} - 1) > jD`.
+
+.. figure:: /_static/figures/transport/slab_radiance.png
+   :width: 55%
+
+   Figure 1. Slab radiance over its optically thin value,
+   :math:`I_\lambda/(j_\lambda D) = -\mathrm{expm1}(-\tau)/\tau`
+   (present), and its thin and thick limits. Script:
+   ``_static/figures/transport/fig_slab.py``.
+
+singleCell: emission and absorption of one cell
+-----------------------------------------------
+
+``singleCell`` computes :math:`j_\lambda` and :math:`\kappa_\lambda` of
+one cell state on one spectral grid and writes them
+(``postProcessing/radiationFoam/spectrum.csv``) with the level
+populations. It performs **no transfer**: the cell is a point. It
+is the mode for checking the spectral coefficients against a baseline
+code or a hand calculation, and for building the coefficients that a
+user then integrates over a path of their choice. The log reports, per
+species and process, the emitted power
+:math:`4\pi\int j_\lambda\,\mathrm{d}\lambda` [W m\ :sup:`-3`] and
+:math:`\int\kappa_\lambda\,\mathrm{d}\lambda` over the window. The
+optically thin radiance of a uniform layer of thickness :math:`D` is
+:math:`j_\lambda D`; the slab formula above applies with the written
+:math:`\kappa_\lambda`.
+
+shockTube1D: radiance across a shock tube
+-----------------------------------------
+
+Geometry
+~~~~~~~~
+
+In a shock-tube experiment such as EAST (Brandis and Cruden 2017) a
+camera looks **across** the tube, perpendicular to its axis, through
+windows in the tube wall, and images the radiance as a function of the
+position :math:`x` along the axis. The flow behind the shock is, to a
+first approximation, one-dimensional: its state depends on :math:`x`
+only.
+
+``shockTube1D`` takes a 1-D profile of cell states along :math:`x` (a
+DSMC solution or a macro file, :doc:`/classes/profiles`) and treats
+**every cell as an independent uniform slab** of thickness :math:`D`,
+the tube diameter (entry ``diameter``). At each wavelength of each
+spectral window:
+
+.. math::
+
+   I_\lambda(x_k) =
+   \begin{cases}
+     -\dfrac{j_\lambda(x_k)}{\kappa_\lambda(x_k)}\,
+       \mathrm{expm1}\!\left(-\kappa_\lambda(x_k)\,D\right),
+       & \kappa_\lambda \ne 0,\\[2ex]
+     j_\lambda(x_k)\,D, & \kappa_\lambda = 0 .
+   \end{cases}
+
+This is the line-of-sight radiance through the tube at the axial
+position of cell :math:`k`, under three assumptions:
+
+* the gas is uniform across the tube along the line of sight (no
+  boundary layer at the walls, no radial variation);
+* no radiation enters the line of sight at the far wall: the walls
+  neither emit nor reflect;
+* there is **no transfer between cells along the tube**: a photon
+  emitted in one cell is not absorbed by its neighbours. The radiance of
+  cell :math:`k` depends only on the state of cell :math:`k`.
+
+The line of sight is a diameter of the tube, so :math:`D` is its full
+length; the chord of a ray off the axis would be shorter, and is not
+modelled.
+
+Mapping the profile onto the tube
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The profile cells are sorted by increasing :math:`x`
+(``shockTubeProfile``) and numbered :math:`k = 0 \dots N-1` in that
+order. Each cell gives the number density and the translational,
+rotational, vibrational and electronic temperatures of every radiating
+species, :math:`n_e` and :math:`T_e`; with ``populationModel
+boltzmannTemperatures`` the level populations are the Boltzmann
+re-expansion of these temperatures (:doc:`/theory/populations`).
+
+With ``populationModel cellDistribution`` the level populations come
+instead from the per-cell distribution files written by the DSMC
+function object ``dsmcRadiationDistribution`` (directory with an index
+``cells`` and files ``cell<k>``; :doc:`/guide/dsmcfoam_coupling`). Each
+distribution cell is matched to the **nearest profile cell** along the
+tube (component ``direction`` of its cell centre), within a tolerance of
+``matchTolerance`` (default 1e-3) times the smallest profile cell
+spacing; that profile cell gives the translational temperatures, the
+densities and the electrons used by the line shapes. The cell index
+:math:`k` is then that of the distribution file.
+
+The position of the shock is not changed: :math:`x` is the coordinate of
+the DSMC case or macro file. The shock front, and the distance behind
+it, are determined only by the optional instrument model, which finds
+:math:`x_0` from the measured band profile or takes a fixed position
+(:doc:`/theory/instrument`).
+
+Band and window integrals
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For each cell, the radiance is integrated over each band :math:`[a, b]`
+(entry ``bands``, in nm) and over each whole window by the rectangle
+rule on the grid points:
+
+.. math::
+
+   I_\mathrm{band}(x_k) = \sum_{\lambda_i \in [a, b]}
+     I_\lambda(x_k, \lambda_i)\,\Delta\lambda
+   \quad [\mathrm{W\,m^{-2}\,sr^{-1}}],
+
+a grid point on a band edge (within :math:`10^{-6}\Delta\lambda`) being
+inside the band. With the bin placement of the lines
+(:doc:`/theory/line_shapes`), a point stands for the bin
+:math:`(\lambda_{i-1}, \lambda_i]`. The emitted power
+:math:`4\pi\sum_i j_\lambda\,\Delta\lambda` [W m\ :sup:`-3`] of each
+window is written as well.
+
+The measured quantities of EAST (instrument line shape, spatial
+resolution, shock-front criterion, nonequilibrium metric) are applied
+to this raw radiance field after the cell loop by the instrument model
+(:doc:`/theory/instrument`); the raw outputs are unchanged.
+
+Escape factor of a uniform cylinder (DSMC side)
+-----------------------------------------------
+
+The radiationFoam repository contains only the two transport models
+above: one-way (no feedback to the flow), with no transfer between
+cells. It contains no escape factor, photon Monte Carlo or ray tracing.
+
+A **local escape factor** is implemented in the DSMC repository
+(dsmcFoam+), in the radiative decay class ``spontaneousEmission``
+(``src/lagrangian/DSMC/radiationCoupling/gasGasReactions/spontaneousEmission``
+there), where the radiative decay of the atomic levels removes energy
+from the gas during the DSMC run. A photon emitted in a line can be
+re-absorbed before it leaves the gas; the escape factor
+:math:`\Lambda` is the fraction that escapes, and the effective decay
+rate of the line is :math:`\Lambda A`. The DSMC class takes
+:math:`\Lambda` for a **uniform infinite cylinder** of radius :math:`R`
+(the tube radius, entry ``radius`` of its ``escape`` dictionary):
+
+* the mean escape probability of photons emitted uniformly and
+  isotropically in the cylinder, of absorption coefficient
+  :math:`\kappa`,
+
+  .. math::
+
+     P_\mathrm{cyl}(\tau_R) = \frac{2}{R^{2}}\int_0^R r\,\mathrm{d}r\;
+       \frac{1}{\pi}\int_0^\pi \mathrm{Ki}_2\!\left(\kappa\,s(r,\varphi)\right)
+       \mathrm{d}\varphi,
+     \qquad \tau_R = \kappa R,
+
+  with :math:`s` the in-plane path to the wall and
+  :math:`\mathrm{Ki}_2` the Bickley function (the polar angle
+  integrated); :math:`P_\mathrm{cyl}(0) = 1` and
+  :math:`P_\mathrm{cyl} \to 1/(2\tau_R)` for large :math:`\tau_R`;
+* the line escape factor :math:`\Lambda(\tau_0, a)`, the integral of
+  :math:`P_\mathrm{cyl}` over the Voigt line profile, with
+  :math:`\tau_0` the optical radius at line centre and :math:`a` the
+  Voigt damping parameter, tabulated in ``escapeCylinder.table``.
+
+The pure-geometry quadrature is
+``src/lagrangian/DSMC/radiation/database/sources/escape_cylinder.py``
+of the DSMC repository. The coupling design of the two codes (one-way
+transport in 2-D and 3-D, the radiation-to-DSMC feedback) is described
+in ``docs/RADIATION_COUPLING_SPEC.md`` of this repository; the parts of
+it that are not listed above are plans, not code of radiationFoam. See
+:doc:`/guide/dsmcfoam_coupling` for what the two codes exchange today.
+
+References
+----------
+
+* Brandis, A. M., Cruden, B. A. (2017). Benchmark shock tube experiments
+  of radiative heating relevant to Earth re-entry. 55th AIAA Aerospace
+  Sciences Meeting, Grapevine, TX, AIAA Paper 2017-1145.
+  doi:10.2514/6.2017-1145

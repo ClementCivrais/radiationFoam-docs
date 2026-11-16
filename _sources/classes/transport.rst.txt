@@ -1,0 +1,332 @@
+Transport classes
+=================
+
+Source: ``src/radiation/transport/``.
+
+::
+
+    transport/
+        basic/radiationTransportModel/   abstract base, run-time selection (entry mode)
+        derived/singleCell/              one cell state, no transfer
+        derived/shockTube1D/             1-D shock-tube profile, slab across the tube
+
+The physics is in :doc:`/theory/transport`. A transport model reads its
+own sub-dictionaries of ``system/radiationProperties``, computes the
+spectral coefficients cell by cell, transfers the radiation and writes
+its outputs to ``postProcessing/radiationFoam/``.
+
+radiationTransportModel
+-----------------------
+
+Abstract base class
+(``basic/radiationTransportModel/radiationTransportModel.H``). It holds
+references to the objects built by the application ``radiationFoam``:
+the ``Time`` of the case, the ``radiationProperties`` dictionary, the
+radiating species (:doc:`/classes/radiators`), the population model
+(:doc:`/classes/populations`) and the continuum processes
+(:doc:`/classes/continuum`). One pure virtual function:
+
+.. code-block:: cpp
+
+   //- Compute the spectra, transfer the radiation, write the outputs
+   virtual void solve() = 0;
+
+Run-time selection: ``radiationTransportModel::New`` reads the word
+entry ``mode`` of ``radiationProperties``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 10 14 58
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``mode``
+     - word
+     - required
+     - ``singleCell`` or ``shockTube1D``
+
+The other top-level entries read by the application are
+``species``, ``populationModel`` and ``continuum``
+(:doc:`/guide/input_reference`).
+
+singleCell
+----------
+
+``derived/singleCell``. Selection name ``singleCell``. One cell state,
+the spectral emission and absorption on one grid, no transfer and no
+mesh.
+
+.. code-block:: cpp
+
+   mode            singleCell;
+   populationModel boltzmannTemperatures;  // or cellDistribution
+   spectralGrid    { minWavelength 700; maxWavelength 900; nPoints 80001; }
+   species         { N { ... } }
+   cellState
+   {
+       electronNumberDensity   1e22;       // [m^-3]
+       electronTemperature     10000;      // [K]
+       // distributionFile "<constant>/radiation/cellDistribution";
+       species
+       {
+           N
+           {
+               numberDensity               1e22;   // [m^-3]
+               translationalTemperature    10000;  // [K]
+               electronicTemperature       10000;  // [K]
+               // vibrationalTemperature, rotationalTemperature: diatomics
+           }
+       }
+   }
+
+.. list-table:: ``spectralGrid`` (class ``spectralGrid``, :doc:`/classes/common`)
+   :header-rows: 1
+   :widths: 22 10 14 54
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``minWavelength``
+     - scalar
+     - required
+     - first grid point [nm]
+   * - ``maxWavelength``
+     - scalar
+     - required
+     - last grid point [nm], larger than ``minWavelength``
+   * - ``nPoints``
+     - label
+     - required
+     - number of points, at least 100; spacing
+       :math:`(\lambda_\mathrm{max} - \lambda_\mathrm{min})/(N - 1)`
+
+.. list-table:: ``cellState``
+   :header-rows: 1
+   :widths: 30 10 12 48
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``electronNumberDensity``
+     - scalar
+     - required
+     - :math:`n_e` [m\ :sup:`-3`]
+   * - ``electronTemperature``
+     - scalar
+     - required
+     - :math:`T_e` [K]
+   * - ``distributionFile``
+     - file name
+     - none
+     - level distribution of the cell (``populationModel
+       cellDistribution``; format in :doc:`/classes/common`)
+   * - ``species/<s>/numberDensity``
+     - scalar
+     - required
+     - [m\ :sup:`-3`], every radiating species
+   * - ``species/<s>/translationalTemperature``
+     - scalar
+     - required
+     - [K]
+   * - ``species/<s>/electronicTemperature``
+     - scalar
+     - 0 (warning)
+     - [K]; absent: :math:`T_{el} = 0`, no electronic excitation
+   * - ``species/<s>/vibrationalTemperature``
+     - scalar
+     - 0
+     - [K], diatomics
+   * - ``species/<s>/rotationalTemperature``
+     - scalar
+     - 0
+     - [K], diatomics
+
+The temperatures are those of the ``boltzmannTemperatures`` population
+model (a Boltzmann re-expansion over the levels,
+:doc:`/theory/populations`).
+
+**Outputs** (``postProcessing/radiationFoam/``):
+
+* ``spectrum.csv``: ``wavelength`` [nm], ``emission_coefficient``
+  [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`],
+  ``absorption_coefficient`` [m\ :sup:`-1`], 17 digits;
+* ``populations_<species>.csv``: ``key``, ``g``, ``energy`` [J],
+  ``number_density`` [m\ :sup:`-3`] of every level;
+* ``continuum.csv``: only with an active continuum, the emission and
+  absorption of each process.
+
+The log gives, per species and continuum process,
+:math:`4\pi\int j\,\mathrm{d}\lambda` [W m\ :sup:`-3`] and
+:math:`\int\kappa\,\mathrm{d}\lambda` [m\ :sup:`-1` m] over the window.
+Worked cases: :doc:`/examples/singleCell_N`, :doc:`/examples/singleCell_O`.
+
+shockTube1D
+-----------
+
+``derived/shockTube1D``. Selection name ``shockTube1D``. The cells of a
+1-D shock-tube profile, each an independent uniform slab of thickness
+``diameter``; radiance
+:math:`I_\lambda = -(j_\lambda/\kappa_\lambda)\,\mathrm{expm1}(-\kappa_\lambda D)`
+(:math:`j_\lambda D` if :math:`\kappa_\lambda = 0`). The line data of
+every species are built once at start-up; per cell only the
+populations, widths and line placement are computed.
+
+.. code-block:: cpp
+
+   mode            shockTube1D;
+   populationModel boltzmannTemperatures;      // or cellDistribution
+   species { N2 { ... } N { ... } O { ... } }
+   shockTube1DCoeffs
+   {
+       diameter        0.1016;                 // [m], EAST 4-inch tube
+       windows
+       {
+           IR  { minWavelength 740; maxWavelength 880; nPoints 14001; }
+           VUV { minWavelength 140; maxWavelength 180; nPoints 8001; }
+       }
+       bands                                   // [nm]
+       {
+           NI_868      (861 872);
+           NI_149      (148.5 150.5);
+       }
+       profile
+       {
+           source      macroFile;
+           file        "<case>/constant/profile.csv";
+       }
+       writeSpectra        none;
+   }
+
+.. list-table:: ``shockTube1DCoeffs``
+   :header-rows: 1
+   :widths: 22 16 12 50
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``diameter``
+     - scalar
+     - required
+     - slab thickness :math:`D` [m], the tube diameter
+   * - ``windows``
+     - dictionary
+     - required
+     - one ``spectralGrid`` sub-dictionary per window (keywords as for
+       ``singleCell``); the sub-dictionary name is the window name
+   * - ``bands``
+     - dictionary
+     - required
+     - ``name (a b);`` in nm, each band inside one window (to half a
+       grid step), else a fatal error; may be empty
+   * - ``profile``
+     - dictionary
+     - required
+     - the cell states, :doc:`/classes/profiles`
+   * - ``distribution``
+     - dictionary
+     - absent
+     - per-cell level distributions (``populationModel
+       cellDistribution``), below
+   * - ``writeSpectra``
+     - ``all``, ``none`` or list of :math:`k`
+     - ``all``
+     - cells whose radiance spectra are written
+   * - ``writeCoefficients``
+     - bool
+     - ``false``
+     - also write :math:`j_\lambda` and :math:`\kappa_\lambda` of the
+       ``writeSpectra`` cells
+   * - ``writeDistributions``
+     - ``all``, ``none`` or list of :math:`k`
+     - ``none``
+     - write the level populations of these cells as distribution files
+   * - ``instrument``
+     - dictionary
+     - absent
+     - EAST measurement model, one sub-dictionary per camera
+       (:doc:`/classes/instrument`)
+   * - ``slabFormula``
+     - (removed)
+     -
+     - any value is a fatal error: the radiance is always the expm1 form
+
+.. list-table:: ``distribution`` (optional)
+   :header-rows: 1
+   :widths: 22 10 12 56
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``directory``
+     - file name
+     - required
+     - directory written by ``dsmcRadiationDistribution``, with the
+       index file ``cells`` (lines ``k x y z``, ``#`` comments) and the
+       files ``cell<k>``; relative paths are relative to the case
+   * - ``direction``
+     - word
+     - ``x``
+     - component (``x``, ``y`` or ``z``) of the cell centre compared
+       with the profile position
+   * - ``matchTolerance``
+     - scalar
+     - 1e-3
+     - matching tolerance as a fraction of the smallest profile cell
+       spacing; a distribution cell farther than that from its nearest
+       profile cell is a fatal error
+
+Cell numbering: without ``distribution``, :math:`k` is the index of the
+profile cell sorted by :math:`x` (0 to :math:`N-1`); with it, :math:`k`
+is the index of the distribution file, and only the listed cells are
+computed. The lists of ``writeSpectra`` and ``writeDistributions`` refer
+to these :math:`k`.
+
+Instrument cameras: each sub-dictionary of ``instrument`` names its
+``window`` (optional when there is one window) and an optional
+``wavelengthRange (a b)`` [nm]; the radiance on that range is copied for
+every cell and the measurement model is applied after the cell loop.
+The camera keywords handled by ``shockTube1D`` itself are
+``distanceUnit`` (``m``, default; ``cm``; ``mm``), ``spatialBinWidth``
+(optional, in ``distanceUnit``: the raw radiance is averaged over
+uniform bins in :math:`x`, weighted by the cell widths),
+``metricHalfWidth`` (default 0.02 m), ``shockFront`` (``position``, or
+``band`` (default: the first camera band) with ``criterion`` (default
+``peakRadiance``); ``upstreamSide`` ``low`` (default) or ``high``),
+``spectra`` and ``writeField`` (default ``false``). Their meaning and
+the instrument functions are documented in :doc:`/classes/instrument`
+and :doc:`/theory/instrument`.
+
+**Outputs** (``postProcessing/radiationFoam/``):
+
+* ``bands.csv``: per cell :math:`k`, ``x`` [m] and the radiance
+  integrated over each band and each whole window [W m\ :sup:`-2`
+  sr\ :sup:`-1`] (rectangle rule on the grid points, a point on a band
+  edge inside the band); the header gives the grid index range of each
+  band;
+* ``profile.csv``: the cell states used (``n_e``, ``T_e``, and
+  ``n``, ``Ttrans``, ``Trot``, ``Tvib``, ``Telec`` per species) and
+  ``emission_<window>``, :math:`4\pi\sum_i j_i\,\Delta\lambda`
+  [W m\ :sup:`-3`];
+* ``spectra_<window>.bin`` and ``.info``: radiance spectra of the
+  ``writeSpectra`` cells, float64 in the byte order of the machine, one
+  row of ``nPoints`` values per cell; the ``.info`` file gives the grid,
+  the byte order and the rows (row, :math:`k`, :math:`x`);
+* with ``writeCoefficients``: ``emission_<window>.bin`` and
+  ``absorption_<window>.bin``, same layout;
+* with ``writeDistributions``: ``distribution/cell<k>`` (and the index
+  ``distribution/cells``), the level populations of the population
+  model in the format of ``dsmcRadiationDistribution`` (17 digits), so a
+  Boltzmann profile can be replayed through ``cellDistribution``;
+* with ``instrument``: ``instrument_<camera>_bands.csv``,
+  ``instrument_<camera>_spectra.csv`` and, with ``writeField``,
+  ``instrument_<camera>_field.bin`` (:doc:`/classes/instrument`).
+
+The log reports the CPU time per cell. Reading the binary files is
+described in :doc:`/guide/post_processing`; worked cases are
+:doc:`/examples/shockTube1D` and :doc:`/examples/east5029`.

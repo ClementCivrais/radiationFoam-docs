@@ -1,0 +1,58 @@
+Tutorials and Examples
+======================
+
+The tutorials are in ``tutorials/`` of the radiationFoam repository. Each
+directory has an ``Allrun`` and an ``Allclean`` script. The ``Allrun``
+scripts set ``RADIATIONFOAM_DIR`` (the root of the checkout, used to find the
+database ``$RADIATIONFOAM_DIR/src/radiation/database``) when it is not already
+set, and run ``radiationFoam`` with the OpenFOAM ``runApplication`` function,
+so the log is ``log.radiationFoam``. Every output is written to
+``postProcessing/radiationFoam/`` of the case (:doc:`/guide/post_processing`).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 46 32
+
+   * - Tutorial
+     - Physics shown
+     - Runtime
+   * - :doc:`singleCell_N`
+     - One uniform cell of atomic nitrogen: line emission and absorption
+       coefficients of the N I 868 nm multiplet, Boltzmann populations,
+       Voigt line shapes with Stark broadening
+     - about a second
+   * - :doc:`singleCell_O`
+     - The same for atomic oxygen, O I 777 nm triplet
+     - about a second
+   * - :doc:`shockTube1D`
+     - A synthetic N\ :sub:`2`/N/O post-shock profile, radiance across a
+       10.16 cm tube per cell and band integrals; the same profile read from
+       a macro file or from a dsmcFoam case
+     - under a minute
+   * - :doc:`east_equilibrium`
+     - Equilibrium columns of 24 EAST shots, all air radiators and the
+       continuum, EAST instrument line shapes, equilibrium radiance compared
+       with EAST
+     - seconds per case (5 cases by default, 50 with ``all``)
+   * - :doc:`east5029`
+     - EAST shot 50-29 measured on a dsmcFoam run with the DSMC
+       :math:`(n,v,J)` populations of every cell: ILS, SRF, front, metric,
+       spectra
+     - hours for every cell (a quick look with ``STRIDE``); needs a dsmcFoam run
+   * - :doc:`instrument_tests`
+     - Verification of the instrument model: 45 checks of every kernel, the
+       convolution, the band integral, the front criteria and the full
+       measurement against analytical results
+     - short (Python reference quadratures dominate)
+
+The runtimes are indications from the logs of runs of the same or larger decks on one core.
+
+.. toctree::
+   :maxdepth: 2
+
+   singleCell_N
+   singleCell_O
+   shockTube1D
+   east_equilibrium
+   east5029
+   instrument_tests

@@ -1,0 +1,283 @@
+Atomic bound-bound lines
+========================
+
+An atom or atomic ion radiates in lines: a transition from an upper level
+:math:`u` to a lower level :math:`l` emits a photon of wavelength
+:math:`\lambda_0 = hc/(E_u - E_l)`, and the reverse transition absorbs one.
+The radiator ``atomicLines``
+(``src/radiation/radiators/derived/atomicLines``) computes the emission and
+absorption of every such line of a species from a list of levels and
+lines, with the level populations of the population model
+(:doc:`/theory/populations`) and a Voigt profile per line
+(:doc:`/theory/line_shapes`). Class and keywords: :doc:`/classes/radiators`.
+
+Data per level and per line
+---------------------------
+
+The atomic file of the database (:doc:`/theory/database`) gives, per
+level, its statistical weight :math:`g = 2J+1`, its energy :math:`E`
+(cm\ :sup:`-1`) and an index; and, per line,
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - Quantity
+     - Meaning
+   * - :math:`\lambda_0`
+     - line centre, vacuum wavelength (Ångström in the file; the NIST ASD
+       Ritz wavelength)
+   * - :math:`l`, :math:`u`
+     - indices of the lower and upper levels
+   * - :math:`g_l^{\mathrm{line}}`, :math:`g_u^{\mathrm{line}}`
+     - statistical weights of the two levels as given with the line
+   * - :math:`A_{ul}`
+     - Einstein coefficient for spontaneous emission [s\ :sup:`-1`]
+   * - :math:`w_S`
+     - Stark half width at half maximum [Å] at :math:`T_e = 10^4` K and
+       :math:`n_e = 10^{16}` cm\ :sup:`-3`
+
+The line centre is taken from the file, not recomputed from the level
+energies. Lines are electric-dipole (E1) lines only.
+
+Einstein coefficients and oscillator strengths
+----------------------------------------------
+
+The three Einstein coefficients of a line are linked by detailed balance.
+:math:`A_{ul}` is the probability per unit time that an atom in :math:`u`
+decays spontaneously to :math:`l`; absorption and stimulated emission
+follow from it, which is why the file needs :math:`A_{ul}` only. The
+absorption oscillator strength often quoted in tables is
+
+.. math::
+
+   f_{lu} = \frac{\varepsilon_0 m_e c\,\lambda_0^2}{2\pi e^2}\,
+            \frac{g_u}{g_l}\,A_{ul},
+
+the relation the code uses in its comments to convert widths written
+with :math:`f_{lu}` (e.g. the resonance width below). The database stores
+:math:`A_{ul}`, not :math:`f_{lu}`.
+
+Emission and absorption of one line
+-----------------------------------
+
+With :math:`n_u`, :math:`n_l` the level populations [m\ :sup:`-3`] from the
+population model and :math:`g(u)`, :math:`g(l)` the weights of the level
+list, the line-integrated coefficients are (``atomicLines.C``)
+
+.. math::
+
+   \epsilon_{ul} = \frac{h c}{4\pi}\,
+     \frac{g_u^{\mathrm{line}}}{g(u)}\,
+     \frac{n_u A_{ul}}{\lambda_0}
+   \quad [\mathrm{W\,m^{-3}\,sr^{-1}}],
+
+.. math::
+
+   k_{ul} = \frac{\lambda_0^4 A_{ul}}{8\pi c}
+     \left(\frac{g_u^{\mathrm{line}}}{g(l)}\,n_l
+         - \frac{g_u^{\mathrm{line}}}{g(u)}\,n_u\right)
+   \quad [\mathrm{m^{-1}\,m}],
+
+and the spectral coefficients on the grid are
+
+.. math::
+
+   j_\lambda(\lambda_i) \mathrel{+}= \max(0, \epsilon_{ul})\,\phi_i,
+   \qquad
+   \kappa_\lambda(\lambda_i) \mathrel{+}= k_{ul}\,\phi_i,
+
+with :math:`\phi_i` [m\ :sup:`-1`] the bin-integrated, area-normalised
+line profile at grid point :math:`i`.
+
+Why these forms. The emission is the number of decays per unit volume and
+time, :math:`n_u A_{ul}`, times the photon energy :math:`hc/\lambda_0`,
+shared equally over :math:`4\pi` sr. The absorption is the absorption rate
+minus the stimulated-emission rate, each written with :math:`A_{ul}`
+through the Einstein relations; with :math:`f_{lu}` it reads
+
+.. math::
+
+   k_{ul} = \frac{e^2\lambda_0^2}{4\varepsilon_0 m_e c^2}\,f_{lu}
+     \left(n_l - \frac{g_l}{g_u}\,n_u\right),
+
+the classical form :math:`\pi r_e \lambda_0^2 f_{lu}\,n_l` corrected for
+stimulated emission (:math:`r_e` the classical electron radius).
+
+Stimulated emission and line gain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The second term of :math:`k_{ul}` is stimulated emission; :math:`k_{ul}`
+is the **net** absorption. When the populations per state are inverted,
+:math:`n_u/g_u > n_l/g_l`, :math:`k_{ul} < 0`: the line amplifies instead
+of absorbing. The code keeps the negative value, as for the bound-free
+continuum, because the slab radiance
+:math:`-(j/\kappa)\,\mathrm{expm1}(-\kappa D)` holds for either sign
+(:doc:`/theory/transport`). Boltzmann populations never invert; inverted
+pairs can occur only with ``cellDistribution``, from the DSMC sampling.
+The emission is clipped at zero (it is non-negative for any physical
+population).
+
+Lumped levels and the ratio :math:`g^{\mathrm{line}}/g`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The factors :math:`g_u^{\mathrm{line}}/g(u)` and
+:math:`g_u^{\mathrm{line}}/g(l)` allow a level list in which fine-structure
+levels are lumped into one level while the lines stay resolved: the line
+then sees the share :math:`g_u^{\mathrm{line}}/g(u)` of the lumped level's
+states. In the shipped files every level is J-resolved and the line
+weights equal the level weights (checked on all four atomic files), so
+the ratios are one and the forms reduce to those of
+:doc:`/theory/foundations`.
+
+Multiplets
+~~~~~~~~~~
+
+A multiplet is the group of lines between the fine-structure components
+:math:`J` of two terms, e.g. the N I 3s :sup:`4`\ P -- 3p
+:sup:`4`\ D\ :sup:`o` multiplet near 868 nm used by the ``singleCell_N``
+tutorial. ``atomicLines`` computes every component as its own line; there
+is no multiplet lumping. The three strongest components in that tutorial
+window, as they appear in ``database/atoms/N_I.dat``, are:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 18 14 14 18 16
+
+   * - :math:`\lambda_0` [Å]
+     - levels (l, u)
+     - :math:`g_l`
+     - :math:`g_u`
+     - :math:`A_{ul}` [s\ :sup:`-1`]
+     - :math:`w_S` [Å]
+   * - 8682.666
+     - 8, 18
+     - 6
+     - 8
+     - :math:`2.53\times10^7`
+     - 0.045
+   * - 8685.788
+     - 7, 17
+     - 4
+     - 6
+     - :math:`1.88\times10^7`
+     - 0.045
+   * - 8688.535
+     - 6, 16
+     - 2
+     - 4
+     - :math:`1.15\times10^7`
+     - 0.045
+
+The same Stark width for the three components reflects its source:
+Johnston (2006) gives one width per multiplet for the 0-6 eV lines (his
+Tables A-2, A-4) and assumes it for every :math:`J` component. Multiplet
+tables also exist on the dsmcFoam side of the coupling (radiative decay in
+the DSMC ladders); they are derived from the same atomic files and live in
+the DSMC_Rovibronic repository.
+
+Which lines are computed
+------------------------
+
+For each cell the species is skipped if :math:`n_s < 10` m\ :sup:`-3` or
+:math:`T_{\mathrm{trans}} < 10` K, or if the population model returns no
+population. Then, line by line:
+
+1. A line whose upper level lies above the bound limit,
+   :math:`E_u > E_b` (the lowered ionisation limit returned by the
+   population model), is skipped: the upper level is not a bound state.
+2. A line farther than :math:`100\max(w_L, w_D) + \Delta\lambda` from the
+   grid is skipped (:math:`w_L`, :math:`w_D` the Lorentz and Doppler
+   widths below).
+3. Otherwise the profile is placed on the grid points of its footprint,
+   :math:`\pm 25` Voigt widths, each point receiving the profile integral
+   over its own bin (:doc:`/theory/line_shapes`).
+
+Note that the bound limit is :math:`E_b = E_{\mathrm{ion}} - \Delta
+E_{\mathrm{ion}}` with :math:`E_{\mathrm{ion}}` the entry
+``ionisationEnergy``. A species given ``ionisationEnergy 0`` has no bound
+limit (:math:`E_b` = ``GREAT``): every level is kept and every line is
+computed, so the entry switches the level cut off. Give the ionisation
+energy of the species for physical results; until 2026-11-16 the value 0
+made :math:`E_b \le 0` and suppressed every line.
+
+Line widths
+-----------
+
+The profile of each line is a Voigt profile built from a Gaussian
+(Doppler) and a Lorentzian width. ``atomicLines`` computes the widths (full
+widths at half maximum, m); the profile, its Voigt width and its placement
+are described in :doc:`/theory/line_shapes`. With :math:`\lambda_0` in m,
+:math:`n` the emitter density, :math:`T_{\mathrm{tr}}` its translational
+temperature and :math:`m` its mass:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 52 30
+
+   * - Width
+     - Expression
+     - Source (as cited in the code)
+   * - Stark
+     - :math:`2\,n_e\,w_S\,(T_e/10^4)^{n_S}\times10^{-32}`
+     - Johnston (2006) Eq. 3.13
+   * - van der Waals
+     - :math:`20\,(\lambda_0^2/c)\,4.5214\times10^{-18}\,n_{\mathrm{tot}}
+       (3k_B T_{\mathrm{tr}} n_{\mathrm{tot}}/\rho)^{0.3}`
+     - form of the verified version
+   * - natural
+     - :math:`\dfrac{\lambda_0^2}{2\pi c}(\Gamma_u + \Gamma_l)`
+     - Laux (1993) Eq. 4.19
+   * - phase (impact)
+     - :math:`\dfrac{\lambda_0^2}{\pi c}\,\dfrac{\nu_{\mathrm{coll}}}{n}`
+     - impact theory
+   * - resonance
+     - :math:`\dfrac{3}{16\pi^3 c}\sqrt{g_u/g_l}\,\lambda_0^5 A_{ul}\,
+       \dfrac{g_l}{g(l)}\,n(l)`
+     - Griem (1964) via Laux (1993) Eq. 4.20
+   * - Doppler
+     - :math:`\sqrt{8k_B\ln 2\,T_{\mathrm{tr}}/m}\;\lambda_0/c`
+     - (``ln 2`` coded as 0.69315)
+
+with :math:`w_L` = Stark + van der Waals + natural + phase + resonance.
+In the Stark width, :math:`n_e` [m\ :sup:`-3`] is the cell electron
+density, :math:`T_e` the cell electron temperature, or the temperature of
+the population model when the cell gives none, and :math:`n_S` the entry
+``starkExponent`` (1/3 for most N and O lines, Park 1982 as quoted by
+Johnston 2006); :math:`n_e = 0` gives no Stark broadening. The natural
+width uses the decay rate of each level,
+
+.. math::
+
+   \Gamma_x = \sum_{\text{lines leaving } x}
+              \frac{g_u^{\mathrm{line}}}{g(x)}\,A,
+
+the mean decay rate per state of a (possibly lumped) level. The phase
+width uses the hard-sphere collision rate of the emitter with every
+radiating species :math:`j` of the cell,
+
+.. math::
+
+   \nu_{\mathrm{coll}} = \sum_j 2\,n\,n_j\,\pi(r + r_j)^2
+     \sqrt{\frac{2 k_B T_m (m + m_j)}{\pi m m_j}},
+
+with :math:`r` the entry ``radius`` and :math:`T_m` the mass-density
+weighted mean translational temperature of the pair. Only the radiating
+species of the case are perturbers: a species of the mixture without a
+radiator does not broaden the lines.
+
+References
+----------
+
+* Griem, H. R. (1964), p. 97, as written by Laux (1993) Eq. 4.20 (the
+  code cites it through Laux).
+* Johnston, C. O. (2006). Nonequilibrium shock-layer radiative heating for
+  Earth and Titan entry. PhD thesis, Virginia Polytechnic Institute and
+  State University.
+* Kramida, A., Ralchenko, Yu., Reader, J. and NIST ASD Team (2024). NIST
+  Atomic Spectra Database (version 5.12). National Institute of Standards
+  and Technology, Gaithersburg, MD. DOI 10.18434/T4W30F.
+* Laux, C. O. (1993). Optical diagnostics and radiative emission of air
+  plasmas. PhD thesis, Stanford University.
+* Park, C. (1982). Cited by Johnston (2006) for the Stark exponent
+  :math:`n_S = 1/3`.

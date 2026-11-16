@@ -1,0 +1,289 @@
+Architecture
+============
+
+The present page is a map of ``libradiationFoam`` (``src/radiation``): its
+directories, the pattern its classes follow, the run-time selection tables
+and the path of the data from the level populations to the measured
+spectrum. The layout dates from the restructure of 2026-11-14
+(``docs/RADIATION_RESTRUCTURE.md``); ``src/radiation/README.md`` keeps the
+same map next to the code.
+
+Design rules
+------------
+
+* **One library, no DSMC dependency.** ``libradiationFoam`` links
+  ``OpenFOAM``, ``finiteVolume`` and ``meshTools`` only; the last two are
+  needed by the ``dsmcCase`` profile reader, which reads the mesh and the
+  fields of a dsmcFoam case. The classes work on plain data and include no
+  cloud or parcel header. The DSMC-side classes live in the plug-in
+  ``libdsmcRadiationCoupling`` of the DSMC repository
+  (:doc:`dsmcfoam_coupling`).
+* **A thin application.** ``radiationFoam.C`` builds the species, the
+  population model and the continuum and runs the transport model named by
+  ``mode``. All physics, input and output are in the library.
+* **Basic and derived classes.** Every family that has alternatives is an
+  abstract base class in ``<family>/basic/`` with a run-time selection
+  table, and its models in ``<family>/derived/``, each selected by a
+  dictionary keyword. Classes without alternatives (data containers,
+  readers, pipelines) sit in their own directory.
+* **Line lists once, populations per cell.** Radiators read their data
+  and build their line lists at construction. Per cell, only the
+  populations, the line widths and the placement of the lines on the grid
+  are computed.
+* **Every keyword is read where it is used**, so a class's header lists
+  its own dictionary entries (:doc:`input_reference`).
+
+Directory map
+-------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 30 36
+
+   * - Directory
+     - Classes
+     - Role
+   * - ``common/spectralGrid``
+     - ``spectralGrid``
+     - uniform wavelength grid (nm in the dictionary, m stored)
+   * - ``common/radiationCellState``
+     - ``radiationCellState``
+     - state of one cell: n and temperatures per species, :math:`n_e`,
+       :math:`T_e`, optional level distribution (and its file reader)
+   * - ``common/radiationLevels``
+     - ``radiationLevels``
+     - the levels a radiator needs: key, g, E (and the energy parts and
+       state constants of diatomics); the contract between radiators and
+       population models
+   * - ``radiators/basic/radiatingSpecies``
+     - ``radiatingSpecies``
+     - base of the radiators (entry ``model``), line placement on the grid
+   * - ``radiators/derived/atomicLines``
+     - ``atomicLines``
+     - bound-bound lines of atoms and atomic ions, widths, electron-impact
+       Stark broadening
+   * - ``radiators/derived/diatomicBands``
+     - ``diatomicBands``
+     - band systems of diatomics line by line; split by role into
+       ``diatomicBandsRead.C`` (molecule file), ``diatomicBandsLines.C``
+       (line positions, Hönl-London factors, levels) and
+       ``diatomicBands.C`` (constructor, coefficients)
+   * - ``lineShapes/basic/lineShapeModel``
+     - ``lineShapeModel``
+     - base of the line profiles (entry ``lineShape``)
+   * - ``lineShapes/derived/voigtWhitingOliveroLongbothum``
+     - ``voigtWhitingOliveroLongbothum``
+     - approximate Voigt profile integrated per bin
+   * - ``populations/basic/radiationPopulationModel``
+     - ``radiationPopulationModel``
+     - base of the population models (entry ``populationModel``)
+   * - ``populations/derived/boltzmannTemperatures``
+     - ``boltzmannTemperatures``
+     - Boltzmann re-expansion at the cell temperatures
+   * - ``populations/derived/cellDistribution``
+     - ``cellDistribution``
+     - the cell's own level distribution, optional fill of missing levels
+   * - ``continuum/basic/continuumModel``
+     - ``continuumModel``
+     - base of one continuum process of one atomic species
+   * - ``continuum/continuumProcesses``
+     - ``continuumProcesses``
+     - container of the processes of a case (entry ``continuum``)
+   * - ``continuum/derived/boundFreePhysical``, ``freeFreePhysical``
+     - ``boundFreePhysical``, ``freeFreePhysical``
+     - photoionisation with the Milne relation; Kramers bremsstrahlung
+   * - ``transport/basic/radiationTransportModel``
+     - ``radiationTransportModel``
+     - base of the transport modes (entry ``mode``)
+   * - ``transport/derived/singleCell``
+     - ``singleCell``
+     - one cell, coefficients only
+   * - ``transport/derived/shockTube1D``
+     - ``shockTube1D``
+     - 1-D profile, slabs of the tube diameter, bands, instrument
+   * - ``profiles/shockTubeProfile``
+     - ``shockTubeProfile``
+     - cell states of a 1-D profile: macro file or dsmcFoam case
+   * - ``instrument/instrumentFunctions/basic/instrumentFunction``
+     - ``instrumentFunction``
+     - base of the instrument kernels (entry ``type``), bin-averaged
+       convolution on any grid
+   * - ``instrument/instrumentFunctions/derived/*``
+     - ``instrumentGaussian``, ``instrumentTopHat``,
+       ``instrumentTrapezoid``, ``instrumentVoigt``,
+       ``instrumentEastLineShape``, ``instrumentTabulated``,
+       ``instrumentComposite``
+     - the kernels
+   * - ``instrument/shockTubeInstrument``
+     - ``shockTubeInstrument``
+     - EAST spectrometer pipeline: line shape, spatial response, bands,
+       shock front
+   * - ``database/``
+     - data
+     - atomic and molecular files, generators and sources
+       (:doc:`/classes/database`)
+
+``src/radiation/Make/files`` lists the sources group by group in this
+order, one comment line per group, and builds
+``$(FOAM_USER_LIBBIN)/libradiationFoam``.
+
+Run-time selection tables
+-------------------------
+
+Six families are selected at run time by a dictionary keyword. Each base
+class declares its table with ``declareRunTimeSelectionTable`` and defines
+it with ``defineRunTimeSelectionTable``; each model registers itself with
+``addToRunTimeSelectionTable`` under the name of its ``TypeName``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 16 30 30
+
+   * - Base class
+     - Keyword
+     - Constructor arguments
+     - Models (``TypeName``)
+   * - ``radiatingSpecies``
+     - ``model``
+     - ``(const word& name, const dictionary& dict)``
+     - ``atomicLines``, ``diatomicBands``
+   * - ``lineShapeModel``
+     - ``lineShape``
+     - ``(const dictionary& dict)``
+     - ``voigtWhitingOliveroLongbothum``
+   * - ``radiationPopulationModel``
+     - ``populationModel``
+     - ``(const dictionary& dict)``
+     - ``boltzmannTemperatures``, ``cellDistribution``
+   * - ``continuumModel``
+     - set by ``continuumProcesses``
+     - ``(const PtrList<radiatingSpecies>& species, const label speciesi,
+       const dictionary& dict)``
+     - ``boundFreePhysical``, ``freeFreePhysical``
+   * - ``radiationTransportModel``
+     - ``mode``
+     - ``(const Time&, const dictionary& radiationProperties, const
+       PtrList<radiatingSpecies>&, const radiationPopulationModel&, const
+       continuumProcesses&)``
+     - ``singleCell``, ``shockTube1D``
+   * - ``instrumentFunction``
+     - ``type``
+     - ``(const dictionary& dict)``
+     - ``gaussian``, ``topHat``, ``trapezoid``, ``voigt``,
+       ``eastLineShape``, ``tabulated``, ``composite``
+
+The selectors (``New``) live in ``<Base>New.C``. An unknown name stops with
+``FatalIOErrorInLookup``, which prints the list of registered names. Two
+selectors also reject a removed name with an explicit message
+(``continuum piclas`` in ``continuumProcesses.C``,
+``type piclasInstrBroadening`` in ``instrumentFunctionNew.C``).
+
+The ``continuumModel`` table is not driven by a user keyword:
+``continuumProcesses`` decides from ``continuum`` and the species entries
+which processes exist (``boundFreePhysical`` for an atom with an
+``ionSpecies``, ``freeFreePhysical`` for an ion) and selects them by name.
+
+Coefficient dictionaries follow the OpenFOAM convention where a family has
+several models: a radiator reads ``<model>Coeffs`` of its species
+(``subDict``, required), a population model ``<model>Coeffs`` of
+``radiationProperties`` (``subOrEmptyDict``, optional). Instrument
+functions read their coefficients from their own dictionary.
+
+Data flow
+---------
+
+.. figure:: /_static/figures/diagrams/dataflow.png
+   :width: 100%
+   :alt: Data flow of radiationFoam
+
+   Data flow of radiationFoam. Inputs on top, the run-time selected
+   families of ``src/radiation`` in the middle, the transport layer and the
+   instrument below. Script:
+   ``_static/figures/diagrams/make_dataflow.py``.
+
+In words, for one cell and one spectral window:
+
+#. **Set-up (once).** Each radiator reads its transition file and builds
+   its levels (``radiationLevels``) and line list. ``continuumProcesses``
+   builds the bound-free and free-free models and reads the
+   photoionisation tables.
+#. **Cell state.** The transport model fills a ``radiationCellState``:
+   number density and temperatures of each radiating species, :math:`n_e`
+   and :math:`T_e`, from ``cellState`` (``singleCell``) or from
+   ``shockTubeProfile`` (``shockTube1D``), plus the level distribution read
+   from a file when the population model is ``cellDistribution``.
+#. **Populations.** For each species, the radiator passes its
+   ``radiationLevels`` to the population model, which returns the number
+   density of every level and the bound limit (the lowered ionisation
+   limit).
+#. **Coefficients.** Each radiator adds its emission
+   :math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and
+   absorption :math:`\kappa_\lambda` [m\ :sup:`-1`] on the grid
+   (``radiatingSpecies::addEmissionAbsorption``): line strengths from the
+   populations, widths from the cell state, profiles from the line-shape
+   model, placed as bin integrals. ``continuumProcesses`` adds the
+   continua.
+#. **Transport.** ``singleCell`` writes the coefficients. ``shockTube1D``
+   converts them into the radiance across a uniform slab of the tube
+   diameter :math:`D`,
+   :math:`I_\lambda=-(j_\lambda/\kappa_\lambda)\,\mathrm{expm1}(-\kappa_\lambda D)`,
+   integrates the bands and writes the spectra.
+#. **Instrument.** After the cell loop, ``shockTube1D`` passes the field
+   :math:`I(x,\lambda)` of each camera to ``shockTubeInstrument``: line
+   shape in wavelength, spatial response in x, band profiles, shock front,
+   measured spectra.
+
+Dependencies between families
+-----------------------------
+
+.. code-block:: text
+
+   common/           <- used by every family
+   lineShapes/       <- radiators/atomicLines (diatomicBands has its own Voigt table)
+   populations/      <- radiators/, continuum/
+   radiators/        <- continuum/ (levels of the species and its ion), transport/
+   continuum/        <- transport/
+   profiles/         <- transport/shockTube1D
+   instrument/       <- transport/shockTube1D, applications/test/radiationInstrument
+
+``instrument/`` depends on nothing else in the library and can be used
+alone, as the test application does.
+
+What each base class requires of a model
+----------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Base class
+     - Pure virtual members
+   * - ``radiatingSpecies``
+     - ``levels()``: the ``radiationLevels`` of the species;
+       ``addEmissionAbsorption(grid, populations, state, speciesi,
+       emission, absorption)``
+   * - ``lineShapeModel``
+     - ``lineProfile(lambda0, widthLorentz, widthDoppler, grid, profile,
+       iStart, iEnd)``: fill the normalised profile [m\ :sup:`-1`] on the
+       grid points it touches, return false if the line misses the grid
+   * - ``radiationPopulationModel``
+     - ``levelPopulations(levels, state, speciesi, nLevel, boundEnergy)``;
+       ``electronTemperature(state, speciesi)``. Optional overrides:
+       ``lineLowerPopulation``, ``modelsLevels``, ``emissionSelectsLines``,
+       ``recordModelledEmission``
+   * - ``continuumModel``
+     - ``addEmissionAbsorption(grid, populations, state, emission,
+       absorption)``: the emission and absorption of the process on the
+       grid
+   * - ``radiationTransportModel``
+     - ``solve()``: read the mode's sub-dictionaries, loop over the cells,
+       write the outputs
+   * - ``instrumentFunction``
+     - ``width()``: a characteristic full width. ``cdf``, ``pdf`` and
+       ``support`` default to the piecewise-linear table of the base class,
+       filled by the constructor with ``setTable(nodes, density)``; a model
+       with an analytic cumulative distribution overrides them instead
+
+The step-by-step recipe for adding a model to one of these families is in
+:doc:`adding_a_feature`; the classes themselves are documented in
+:doc:`/classes/index`.

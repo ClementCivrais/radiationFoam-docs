@@ -1,0 +1,256 @@
+Profile classes
+===============
+
+Source: ``src/radiation/profiles/shockTubeProfile/``.
+
+shockTubeProfile
+----------------
+
+``shockTubeProfile`` reads the cell states of a 1-D shock-tube profile
+for the ``shockTube1D`` transport mode (:doc:`/classes/transport`): per
+cell, the position :math:`x` along the tube, the number density and the
+translational, rotational, vibrational and electronic temperatures of
+every radiating species, and the electron density and temperature. All
+quantities are SI (m, m\ :sup:`-3`, K). After reading, the cells are
+**sorted by increasing** :math:`x`; this order defines the cell index
+:math:`k` of the outputs. Negative values read from either source are
+set to 0.
+
+It is not a run-time selectable class: ``shockTube1D`` constructs it
+from the ``profile`` sub-dictionary of ``shockTube1DCoeffs``, the names
+of the radiating species and the ``Time`` of the radiation case. The
+entry ``source`` chooses the reader.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 10 14 58
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``source``
+     - word
+     - required
+     - ``macroFile`` or ``dsmcCase``; another value is a fatal error
+
+Source macroFile
+~~~~~~~~~~~~~~~~
+
+A comma-separated text file, one row per cell. Lines starting with
+``#`` and empty lines are comments; the first other line is the header.
+Columns are found **by name**, in any order:
+
+.. code-block:: text
+
+   # synthetic post-shock profile (x [m]; n [m^-3], T [K])
+   x,n_e,T_e,n_N2,Ttrans_N2,Telec_N2,Trot_N2,Tvib_N2,n_N,Ttrans_N,Telec_N
+   -0.00345,1e+21,10000.0,2.56e+21,300.0,300.0,300.0,300.0,1e+15,300.0,300.0
+   ...
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 16 64
+
+   * - Column
+     - Required
+     - Meaning
+   * - ``x``
+     - yes
+     - position along the tube [m]
+   * - ``n_<s>``
+     - yes, every species
+     - number density of radiating species ``<s>`` [m\ :sup:`-3`]
+   * - ``Ttrans_<s>``
+     - yes, every species
+     - translational temperature [K]
+   * - ``Trot_<s>``, ``Tvib_<s>``
+     - no (0)
+     - rotational and vibrational temperatures [K] (diatomics)
+   * - ``Telec_<s>``
+     - no (0, warning)
+     - electronic temperature [K]; absent means no electronic
+       excitation
+   * - ``n_e``, ``T_e``
+     - no
+     - electron density [m\ :sup:`-3`] and temperature [K]; when
+       absent, the entries ``electronNumberDensity`` and
+       ``electronTemperature`` of the ``profile`` dictionary give a
+       uniform value (required then)
+
+A column given twice, a row with a different number of values than the
+header, a missing required column or a file without rows stops with a
+fatal error. Trailing blanks and carriage returns are stripped. The
+columns are the five per-species scalars of a multi-temperature state
+(density, :math:`T_{vib}`, :math:`T_{rot}`, :math:`T_{el}`,
+:math:`T_{trans}`).
+
+.. list-table:: ``profile`` entries, ``source macroFile``
+   :header-rows: 1
+   :widths: 26 10 14 50
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``file``
+     - file name
+     - required
+     - the macro file; ``$VAR`` and ``<case>`` expanded, relative paths
+       relative to the radiation case
+   * - ``electronNumberDensity``
+     - scalar
+     - required if no ``n_e`` column
+     - [m\ :sup:`-3`]
+   * - ``electronTemperature``
+     - scalar
+     - required if no ``T_e`` column
+     - [K]
+
+.. code-block:: cpp
+
+   profile
+   {
+       source      macroFile;
+       file        "<case>/constant/profile.csv";
+   }
+
+Source dsmcCase
+~~~~~~~~~~~~~~~
+
+The cell centres and fields of one time directory of a **reconstructed**
+dsmcFoam case are read directly (the mesh of the DSMC case is loaded
+without its ``controlDict``, function objects or libraries). The DSMC
+function object ``dsmcVolFields`` (one instance per species,
+``fieldName`` = the species name) writes, per species :math:`s`,
+
+* ``rhoN_<s>``: number density [m\ :sup:`-3`];
+* ``translationalT_<s>``: translational temperature [K];
+* ``internalT_<s>``: the internal temperature [K], i.e. the one
+  temperature whose Boltzmann distribution over the rovibronic
+  :math:`(n, v, J)` ladder of the species has the sampled mean internal
+  energy.
+
+dsmcFoam writes no separate rotational, vibrational or electronic
+temperature, because its internal state is rovibronic. The default
+mapping is therefore
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 26 40
+
+   * - Cell-state quantity
+     - Keyword (per species)
+     - Default field
+   * - number density
+     - ``numberDensity``
+     - ``rhoN_<s>``
+   * - translational temperature
+     - ``translationalTemperature``
+     - ``translationalT_<s>``
+   * - rotational temperature
+     - ``rotationalTemperature``
+     - ``internalT_<s>``
+   * - vibrational temperature
+     - ``vibrationalTemperature``
+     - ``internalT_<s>``
+   * - electronic temperature
+     - ``electronicTemperature``
+     - ``internalT_<s>``
+
+and any of the five can be given another field name in the species
+sub-dictionary. With ``populationModel cellDistribution`` the
+temperatures other than the translational ones do not set the level
+populations; those come from the distribution files.
+
+.. list-table:: ``profile`` entries, ``source dsmcCase``
+   :header-rows: 1
+   :widths: 24 16 12 48
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``case``
+     - file name
+     - required
+     - the dsmcFoam case directory; relative paths are relative to the
+       radiation case
+   * - ``time``
+     - ``latestTime`` or scalar
+     - required
+     - the time directory read (a value must match an existing time)
+   * - ``direction``
+     - word
+     - ``x``
+     - component (``x``, ``y``, ``z``) of the cell centre used as
+       :math:`x`
+   * - ``species``
+     - dictionary
+     - required
+     - one optional sub-dictionary per radiating species with the field
+       names above (an absent or empty sub-dictionary keeps the
+       defaults)
+   * - ``electrons``
+     - dictionary
+     - required
+     - ``numberDensity`` and ``temperature``, each a field name or a
+       number (uniform value, [m\ :sup:`-3`] and [K])
+
+.. code-block:: text
+
+   profile
+   {
+       source      dsmcCase;
+       case        "../dsmcCase";
+       time        latestTime;
+       direction   x;
+       species
+       {
+           N2 { rotationalTemperature translationalT_N2; }
+           N  { }
+           O  { }
+       }
+       electrons
+       {
+           numberDensity   1e+21;      // [m^-3] or a field name
+           temperature     10000;      // [K] or a field name
+       }
+   }
+
+**Decomposed runs.** The reader uses the case root only. If the case is
+decomposed and not reconstructed (``processor0`` holds a later time
+than the root, or the requested time exists in ``processor0`` only),
+it stops with a fatal error asking for ``reconstructPar``.
+
+Every cell of the DSMC mesh becomes a profile cell, so the DSMC mesh
+should be a 1-D row of cells along ``direction``; the reader does not
+average over the other two directions.
+
+Shock position
+~~~~~~~~~~~~~~
+
+``shockTubeProfile`` does not shift or align the profile: :math:`x` is
+the coordinate of the macro file or of the DSMC mesh. The shock front
+used for the measured quantities (distance behind the shock,
+nonequilibrium metric) is found by the instrument model of
+``shockTube1D`` from the measured band profile, or given as a fixed
+position (``shockFront`` of each camera, :doc:`/theory/instrument`).
+
+Member functions
+~~~~~~~~~~~~~~~~
+
+* ``size()``: number of cells; ``x()``: positions [m], sorted;
+  ``sourceInfo()``: description for the log;
+* ``setState(celli, state)``: fills the number densities and the five
+  temperatures of every species and :math:`n_e`, :math:`T_e` of cell
+  ``celli`` into a ``radiationCellState`` (:doc:`/classes/common`); the
+  species names, masses and radii are left unchanged;
+* ``nearestCell(x)``: index of the cell nearest to position :math:`x`
+  (used to match the distribution cells, :doc:`/classes/transport`).
+
+Writing a macro file from other data: the tutorial
+``tutorials/shockTube1D/macroFile`` ships a synthetic profile
+(``constant/profile.csv``), and ``tutorials/shockTube1D/fromDsmcCase``
+reads the same profile from the fields of ``tutorials/shockTube1D/dsmcCase``
+(:doc:`/examples/shockTube1D`).

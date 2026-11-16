@@ -1,0 +1,203 @@
+Common data classes
+===================
+
+Source: ``src/radiation/common/``.
+
+Three plain-data classes are shared by every part of the library: the
+wavelength grid, the state of one cell and the list of levels of a
+radiator. None is run-time selectable; none includes cloud or parcel
+headers. Theory: :doc:`/theory/foundations`, :doc:`/theory/populations`.
+
+spectralGrid
+------------
+
+``src/radiation/common/spectralGrid/spectralGrid.{H,C}``
+
+Uniform grid of vacuum wavelengths,
+:math:`\lambda_i = \lambda_{\min} + i\Delta\lambda`,
+:math:`\Delta\lambda = (\lambda_{\max} - \lambda_{\min})/(N-1)`. The
+dictionary gives the bounds in nm; every stored wavelength is in m, so the
+spectral coefficients built on the grid are per metre of wavelength.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``minWavelength``
+     - scalar
+     - required
+     - smallest wavelength [nm]
+   * - ``maxWavelength``
+     - scalar
+     - required
+     - largest wavelength [nm]; must exceed ``minWavelength``
+   * - ``nPoints``
+     - label
+     - required
+     - number of grid points, at least 100
+
+.. code-block:: cpp
+
+   spectralGrid
+   {
+       minWavelength   867.9;
+       maxWavelength   869.2;
+       nPoints         1000;
+   }
+
+Member functions: ``lambdaMin()``, ``lambdaMax()``, ``dLambda()`` [m],
+``size()``, ``lambda()`` (the grid, ``scalarField`` [m]). Constructed by the
+transport models: once by ``singleCell`` (sub-dictionary ``spectralGrid``),
+once per window by ``shockTube1D`` (sub-dictionaries of ``windows``).
+
+radiationCellState
+------------------
+
+``src/radiation/common/radiationCellState/radiationCellState.{H,C}``
+
+The state of one cell as the radiating species see it: one entry per
+radiating species, plus the free electrons. The transport models fill it
+with the **radiating species of the case only**, so a species of the
+mixture without a radiator (e.g. Ar, NO\ :sup:`+`) does not act as a
+perturber in the line widths.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 22 50
+
+   * - Public member
+     - Type, units
+     - Meaning
+   * - ``species``
+     - ``wordList``
+     - species names
+   * - ``numberDensity``
+     - ``scalarList`` [m\ :sup:`-3`]
+     - number density per species
+   * - ``Ttrans``, ``Telec``
+     - ``scalarList`` [K]
+     - translational and electronic temperature per species
+   * - ``Tvib``, ``Trot``
+     - ``scalarList`` [K]
+     - vibrational and rotational temperature (diatomics; 0 for atoms)
+   * - ``mass``, ``radius``
+     - ``scalarList`` [kg], [m]
+     - particle mass; hard-sphere radius (phase broadening)
+   * - ``electronNumberDensity``, ``Telectron``
+     - ``scalar`` [m\ :sup:`-3`], [K]
+     - free electrons
+   * - ``distributionIds``, ``distributionN``
+     - ``List<List<wordList>>``, ``List<scalarList>`` [m\ :sup:`-3`]
+     - level distribution per species: identifiers and number density of
+       each entry
+   * - ``distributionG``
+     - ``List<scalarList>``
+     - optional weight of the DSMC level of each entry (empty if absent)
+   * - ``distributionGiven``
+     - ``boolList``
+     - the file has the species (its list may be empty)
+   * - ``distributionCoverageGiven``, ``distributionCoverage``
+     - ``boolList``, ``List<List<wordList>>``
+     - the coverage entry: ``complete`` (atoms) or runs
+       (state, :math:`v`, :math:`J_0`, :math:`J_1`) (diatomics)
+   * - ``distributionCell``
+     - ``label``
+     - the ``cell`` entry of the distribution file, -1 if absent
+       (diagnostics)
+
+The temperatures are the input of ``boltzmannTemperatures``; the
+distribution is the input of ``cellDistribution``.
+
+Member functions:
+
+* ``size()``: number of species;
+* ``hasDistribution(i)``: true if the distribution file has species
+  :math:`i`;
+* ``readDistribution(file)``: read the level distribution of the listed
+  species from a distribution file.
+
+Distribution file format (read by ``readDistribution``; one
+sub-dictionary per species, species absent from the file have no
+distribution):
+
+.. code-block:: cpp
+
+   cell 12;                         // optional
+   N
+   {
+       levels ( (1) 9.6e20  (6 7 8) 3.1e15 );   // (identifiers) n [m^-3]
+       g ( 4 12 );                  // optional, one value per entry
+       coverage complete;           // optional (atoms)
+   }
+   N2
+   {
+       levels ( (X1Sigma 0 12) 1.2e18 );        // (state v J) n [m^-3]
+       coverage ( (X1Sigma 0 0 54) ("1c1Pi" 1 0 30) );  // optional
+   }
+
+Identifiers are words, integers (read as their decimal text) or quoted
+strings. Errors that stop the run: a missing ``(``, an entry with no
+identifier, a non-numeric density, a list ``g`` of another length than
+``levels``, a malformed coverage run. The matching of identifiers to
+levels belongs to the population model (:doc:`populations`).
+
+radiationLevels
+---------------
+
+``src/radiation/common/radiationLevels/radiationLevels.H``
+
+The list of spectroscopic levels whose number densities a radiator needs,
+as given by its transition data: the contract between a radiating species
+and a population model. Built by each radiator at construction and
+returned by ``radiatingSpecies::levels()``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 22 50
+
+   * - Public member
+     - Type, units
+     - Meaning
+   * - ``species``, ``molecular``
+     - ``word``, ``bool``
+     - species name; true for a diatomic
+   * - ``term``
+     - ``wordList``
+     - atom: level label (index column of the file); diatomic:
+       electronic-state label
+   * - ``v``, ``J``
+     - ``labelList``
+     - diatomic only: vibrational and rotational quantum numbers
+   * - ``Jlabel``
+     - ``wordList``
+     - diatomic only: "2J/2" for a half-integer level that shares
+       (state, :math:`v`, :math:`J-1/2`) with an integer-:math:`J`
+       level; empty otherwise
+   * - ``g``, ``E``
+     - ``scalarList`` [-], [J]
+     - statistical weight; energy above the species ground level
+   * - ``ionisationEnergy``
+     - ``scalar`` [J]
+     - limit for the lowering of the ionisation limit (:math:`\le 0`:
+       none; 0 for diatomics)
+   * - ``Eel``, ``Evib``, ``Erot``
+     - ``scalarList`` [J]
+     - diatomic: parts of :math:`E` (:math:`T_e`, :math:`G(v)`,
+       :math:`B_vJ(J+1)`)
+   * - ``stateName``, ``stateG``, ``stateTe``, ``stateD0``, ``stateWe``,
+       ``stateWexe``, ``stateWeye``, ``stateWeze``, ``stateBe``,
+       ``stateAlphae``
+     - ``wordList``, ``scalarList`` [J]
+     - diatomic: constants of every electronic state of the molecule file,
+       for the partition function
+
+``size()`` returns the number of levels; ``key(i)`` the matching key of
+level :math:`i`: the label for an atom, "term v J" for a diatomic
+(:math:`J` the integer :math:`J`, or :math:`J - 1/2` for a half-integer
+:math:`J`, or the ``Jlabel`` when set, e.g. ``X2Sigma 0 5/2``).
+Fine-structure components of the data that share :math:`(n,v,J)` are
+separate levels with the same key; a distribution entry covers them all.

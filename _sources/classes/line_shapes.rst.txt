@@ -1,0 +1,130 @@
+Line-shape classes
+==================
+
+Source: ``src/radiation/lineShapes/``.
+
+::
+
+    lineShapes/
+        basic/lineShapeModel/                      abstract base, run-time selection
+        derived/voigtWhitingOliveroLongbothum/     approximate Voigt profile
+
+A line-shape model distributes one spectral line onto a spectral grid.
+The physics (widths, Voigt approximation, truncation and bin placement)
+is explained in :doc:`/theory/line_shapes`. The classes work on plain
+data only (no mesh, no cloud).
+
+lineShapeModel
+--------------
+
+Abstract base class
+(``basic/lineShapeModel/lineShapeModel.H``). It holds the model
+coefficients (the dictionary it was built from) and declares one pure
+virtual function:
+
+.. code-block:: cpp
+
+   virtual bool lineProfile
+   (
+       const scalar lambda0,        // line centre [m]
+       const scalar widthLorentz,   // Lorentz FWHM w_L [m]
+       const scalar widthDoppler,   // Gauss (Doppler) FWHM w_D [m]
+       const spectralGrid& grid,
+       scalarField& profile,        // filled on [iStart, iEnd] [m^-1]
+       label& iStart,
+       label& iEnd
+   ) const = 0;
+
+It fills ``profile[iStart..iEnd]`` (0-based, inclusive) with the
+normalised profile :math:`\phi_i` [m\ :sup:`-1`], so that a line of
+integrated coefficient :math:`E` adds :math:`E\,\phi_i` to the spectrum
+at point :math:`i`. Every point receives the profile integral over its
+own bin divided by :math:`\Delta\lambda`, so the profile integrates to 1
+on any grid for a line inside the window. It returns ``false`` when the
+line does not reach the grid; ``profile`` is then left untouched. The
+values outside ``[iStart, iEnd]`` are not reset: callers use only that
+range.
+
+Run-time selection: ``lineShapeModel::New(dict)`` reads the word entry
+``lineShape`` of ``dict`` and constructs the named model; an unknown name
+stops with the list of valid ones.
+
+voigtWhitingOliveroLongbothum
+-----------------------------
+
+The only line shape (``derived/voigtWhitingOliveroLongbothum``).
+
+* **Selection name:** ``voigtWhitingOliveroLongbothum``.
+* **Width:** Liu et al. (2001) Voigt width from :math:`w_L` and
+  :math:`w_D`. The name keeps Olivero and Longbothum (1977), whose width
+  formula this one replaces (the two agree within 3e-4).
+* **Shape:** Whiting (1968), with the wing correction evaluated as one
+  exponential (see the note in :doc:`/theory/line_shapes`).
+* **Discretisation:** cumulative table of 2001 points over
+  :math:`\pm 25\,w_V` (rectangle rule, normalised to unit area),
+  linear interpolation with step :math:`25\,w_V/1001`; bin
+  :math:`(\lambda_{i-1}, \lambda_i]` per point; footprint on the
+  unbounded lattice clipped to the grid.
+* **Dictionary entries:** none besides the selector. The table is
+  rebuilt at every call (once per line and cell).
+
+Where it is used
+~~~~~~~~~~~~~~~~
+
+``atomicLines`` reads ``lineShape`` from its ``atomicLinesCoeffs``
+sub-dictionary and calls ``lineProfile`` once per line and cell:
+
+.. code-block:: c++
+
+   N
+   {
+       model           atomicLines;
+       mass            2.326e-26;      // [kg]
+       radius          0.7e-10;        // [m]
+       atomicLinesCoeffs
+       {
+           transitionFile    "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat";
+           ionisationEnergy  117345;   // [cm^-1]
+           starkExponent     0.33;     // [-]
+           lineShape         voigtWhitingOliveroLongbothum;
+       }
+   }
+
+The widths passed to it are computed by ``atomicLines`` (Stark, van der
+Waals, natural, phase and resonance for :math:`w_L`, Doppler for
+:math:`w_D`). Before the call, a line is skipped if its upper level is
+above the bound limit or if
+:math:`\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)` misses the
+grid.
+
+``diatomicBands`` does **not** select a line shape: it evaluates the
+same Whiting shape, table and placement inline (``diatomicBands.C``),
+with its own widths and the Voigt width
+:math:`w_L/2 + \sqrt{w_L^2/4 + w_G^2}`, one table per vibrational
+transition. Its dictionary has no ``lineShape`` entry
+(:doc:`/classes/radiators`).
+
+Adding a line shape
+~~~~~~~~~~~~~~~~~~~
+
+A new model derives from ``lineShapeModel``, implements
+``lineProfile`` with the same contract (bin integrals, unit area on any
+grid, ``false`` when off the grid), and registers itself with
+``addToRunTimeSelectionTable(lineShapeModel, <name>, dictionary)``. Its
+coefficients are read from the same dictionary as ``lineShape``. See
+:doc:`/guide/adding_a_feature`.
+
+References
+----------
+
+* Liu, Y., Lin, J., Huang, G., Guo, Y., Duan, C. (2001). Simple
+  empirical analytical approximation to the Voigt profile. *Journal of
+  the Optical Society of America B*, 18(5), 666.
+  doi:10.1364/JOSAB.18.000666
+* Olivero, J. J., Longbothum, R. L. (1977). Empirical fits to the Voigt
+  line width: a brief review. *Journal of Quantitative Spectroscopy and
+  Radiative Transfer*, 17(2), 233-236.
+  doi:10.1016/0022-4073(77)90161-3
+* Whiting, E. E. (1968). An empirical approximation to the Voigt
+  profile. *Journal of Quantitative Spectroscopy and Radiative Transfer*,
+  8(6), 1379-1384. doi:10.1016/0022-4073(68)90081-2

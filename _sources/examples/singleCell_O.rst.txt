@@ -1,0 +1,131 @@
+singleCell_O: one cell of atomic oxygen
+=======================================
+
+Directory: ``tutorials/singleCell_O/``.
+
+Purpose
+-------
+
+The oxygen twin of :doc:`singleCell_N`: one uniform cell of atomic oxygen,
+no mesh and no transport, giving the emission and absorption coefficients
+of the O I 777 nm triplet and the level populations. The triplet is one of
+the strongest atomic features of shock-heated air in the near infrared and
+a standard EAST diagnostic window, so this case is the quickest check of the
+O I line list and of the line shapes.
+
+Physics shown
+-------------
+
+* Boltzmann populations of O I at the electronic temperature (10 000 K) up to
+  the bound limit (:doc:`/theory/populations`).
+* Bound-bound emission and absorption of the three lines of the
+  3s :sup:`5`\ S - 3p :sup:`5`\ P multiplet at vacuum wavelengths 777.41,
+  777.63 and 777.75 nm (``O_I.dat``: one lower level of :math:`g` = 5, upper
+  levels of :math:`g` = 7, 5, 3, all with :math:`A_{ul}` =
+  3.69 :math:`\times 10^7` s\ :sup:`-1`) (:doc:`/theory/atomic_lines`).
+* Voigt line shapes: Doppler at 20 000 K, Stark broadening by
+  :math:`n_e` = 10\ :sup:`21` m\ :sup:`-3` at :math:`T_e` = 10 000 K with
+  exponent 0.33 (Johnston 2006, Eq. 3.13), and the collisional and natural
+  widths (:doc:`/theory/line_shapes`).
+
+Case files
+----------
+
+The case has the same layout and the same ``controlDict`` as
+:doc:`singleCell_N`. ``system/radiationProperties`` differs only in the
+window, the species data and the file:
+
+.. code-block:: cpp
+
+   mode            singleCell;
+   populationModel boltzmannTemperatures;
+
+   spectralGrid
+   {
+       minWavelength       777.25;     // [nm]
+       maxWavelength       777.95;     // [nm]
+       nPoints             500;
+   }
+
+   species
+   {
+       O
+       {
+           model           atomicLines;
+           mass            2.657e-26;      // [kg]
+           radius          0.66e-10;       // [m]
+           atomicLinesCoeffs
+           {
+               transitionFile      "$RADIATIONFOAM_DIR/src/radiation/database/atoms/O_I.dat";
+               ionisationEnergy    109837.02;      // [cm^-1], NIST ASD v5.12
+               starkExponent       0.33;           // Johnston (2006) Eq. 3.13
+               lineShape           voigtWhitingOliveroLongbothum;
+           }
+       }
+   }
+
+   cellState
+   {
+       electronNumberDensity   1e21;           // [m^-3]
+       electronTemperature     10000;          // [K]
+       species
+       {
+           O
+           {
+               numberDensity               1e21;   // [m^-3]
+               translationalTemperature    20000;  // [K]
+               electronicTemperature       10000;  // [K]
+           }
+       }
+   }
+
+The meaning of every entry is given in :doc:`singleCell_N`. The window
+(0.7 nm, 500 points, 1.4 pm spacing) is centred on the triplet.
+
+How to run
+----------
+
+.. code-block:: bash
+
+   cd tutorials/singleCell_O
+   ./Allrun
+   ./Allclean
+
+About a second; log in ``log.radiationFoam``.
+
+Output
+------
+
+``postProcessing/radiationFoam/spectrum.csv`` (wavelength [nm],
+:math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`],
+:math:`\kappa_\lambda` [m\ :sup:`-1`]) and ``populations_O.csv`` (key,
+:math:`g`, energy [J], number density [m\ :sup:`-3`]). The plotting snippet
+of :doc:`singleCell_N` applies unchanged.
+
+Expected result
+---------------
+
+Three lines of emission peak areas in the ratio of :math:`g_u` = 7 : 5 : 3
+(the three upper levels lie within 6 cm\ :sup:`-1` of each other, so their
+Boltzmann factors are almost equal and :math:`A_{ul}` is the same), the
+strongest at 777.41 nm. The populations follow a Boltzmann distribution at
+10 000 K.
+
+A single-cell O I case of this kind was verified during development against
+the PICLas regression case ``Rad_Emission_SingleCell_O`` (a past verification
+reference, with the PICLas line file and no Stark broadening): emission and
+absorption agreed to :math:`1.6\times10^{-6}` relative
+(``run/RAD/compare_singleCell.csv`` of the DSMC_Rovibronic repository). The
+tutorial reads the radiation database and includes Stark broadening, so its
+numbers differ from that reference.
+
+
+References
+----------
+
+* Johnston, C. O., *Nonequilibrium shock-layer radiative heating for Earth
+  and Titan entry*, PhD thesis, Virginia Polytechnic Institute and State
+  University, 2006.
+* Kramida, A., Ralchenko, Yu., Reader, J. and NIST ASD Team, NIST Atomic
+  Spectra Database (version 5.12), National Institute of Standards and
+  Technology, Gaithersburg, MD, 2024. doi:10.18434/T4W30F

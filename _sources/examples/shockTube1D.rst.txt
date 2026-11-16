@@ -1,0 +1,281 @@
+shockTube1D: radiance along a 1-D post-shock profile
+====================================================
+
+Directory: ``tutorials/shockTube1D/``.
+
+Purpose
+-------
+
+This tutorial computes the radiance across a shock tube, cell by cell, along
+a 1-D post-shock profile of N\ :sub:`2`, N and O, and integrates it over
+seven wavelength bands. The same profile is read through the two profile
+sources of the ``shockTube1D`` mode, so the tutorial also shows how a
+dsmcFoam result enters radiationFoam:
+
+``macroFile``
+   the profile is a CSV file of per-cell number densities and temperatures;
+``fromDsmcCase``
+   the profile is read from the fields of a reconstructed dsmcFoam case;
+``dsmcCase``
+   that dsmcFoam case: a mesh and one time directory of fields holding the
+   same profile (not a DSMC run, only its output format).
+
+Physics shown
+-------------
+
+* **Line-of-sight radiance across the tube** (:doc:`/theory/transport`):
+  every cell is a uniform slab of thickness :math:`D` = 10.16 cm (the EAST
+  tube), with
+
+  .. math::
+
+     I_\lambda = -\frac{j_\lambda}{\kappa_\lambda}\,
+     \mathrm{expm1}(-\kappa_\lambda D) \quad (\kappa_\lambda \ne 0),
+     \qquad I_\lambda = j_\lambda D \quad (\kappa_\lambda = 0),
+
+  :math:`j_\lambda` and :math:`\kappa_\lambda` summed over the radiators; no
+  attenuation from cell to cell.
+* **Multi-temperature Boltzmann populations** (``boltzmannTemperatures``):
+  the N\ :sub:`2` rovibronic levels from its rotational, vibrational and
+  electronic temperatures, the atoms from their electronic temperatures
+  (:doc:`/theory/populations`).
+* **Molecular bands and atomic lines together**: N\ :sub:`2`
+  (``diatomicBands``, :doc:`/theory/diatomic_bands`), N and O
+  (``atomicLines``, :doc:`/theory/atomic_lines`).
+* **Two spectral windows**: an infrared window 740-880 nm (N I and O I lines,
+  N\ :sub:`2` first positive) and a vacuum-ultraviolet window 140-180 nm
+  (N I resonance multiplets).
+
+The profile
+-----------
+
+``macroFile/constant/profile.csv`` is a synthetic post-shock profile of 85
+cells, 0.1 mm apart, from :math:`x` = -3.45 mm to 4.95 mm. Upstream of the
+front (the first five cells) the gas is cold N\ :sub:`2` at 300 K; behind it
+the translational temperature jumps to 38 800 K and relaxes to about
+9 500 K, while the internal temperatures (columns ``Tvib_N2``, ``Telec_*``)
+rise to a maximum of 11 500 K and meet it; N\ :sub:`2` dissociates into N and
+O. The electrons are fixed at :math:`n_e` = 10\ :sup:`21` m\ :sup:`-3` and
+:math:`T_e` = 10 000 K. Columns ``Ttrans_*`` and ``Trot_N2`` are equal, and
+``Tvib_N2`` equals every ``Telec_*``.
+
+.. figure:: /_static/figures/examples/shockTube1D_profile.png
+   :width: 55%
+   :align: center
+
+   Input profile of the tutorial (``macroFile/constant/profile.csv``):
+   number densities and temperatures along the tube. Script
+   ``_static/figures/examples/shockTube1D_profile.py`` (plots the input file
+   only).
+
+The macro file has one row per cell and columns found by name (any order,
+``#`` lines are comments):
+
+.. code-block:: text
+
+   x,n_e,T_e,n_N2,Ttrans_N2,Telec_N2,Trot_N2,Tvib_N2,n_N,Ttrans_N,Telec_N,n_O,Ttrans_O,Telec_O
+
+``n_<s>`` and ``Ttrans_<s>`` are required for every radiating species;
+``Trot_<s>``, ``Tvib_<s>``, ``Telec_<s>`` are 0 when absent (a missing
+``Telec_<s>`` is reported); ``n_e`` and ``T_e`` are taken from the file or
+from ``electronNumberDensity`` / ``electronTemperature`` of the profile
+dictionary (:doc:`/classes/profiles`).
+
+Case files
+----------
+
+.. code-block:: text
+
+   shockTube1D/
+       Allrun, Allclean
+       macroFile/
+           constant/profile.csv
+           system/{controlDict, radiationProperties}
+       fromDsmcCase/
+           system/{controlDict, radiationProperties}
+       dsmcCase/
+           system/{blockMeshDict, controlDict, fvSchemes, fvSolution}
+           1e-05/{rhoN_<s>, translationalT_<s>, internalT_<s>}   s = N2, N, O
+
+``macroFile/system/radiationProperties`` (species block abbreviated):
+
+.. code-block:: cpp
+
+   mode            shockTube1D;
+   populationModel boltzmannTemperatures;
+
+   species
+   {
+       N2 { model diatomicBands; mass 4.652e-26; radius 0;
+            diatomicBandsCoeffs { transitionFile
+              "$RADIATIONFOAM_DIR/src/radiation/database/molecules/N2.dat"; } }
+       N  { model atomicLines; ... N_I.dat ... }     // as singleCell_N
+       O  { model atomicLines; ... O_I.dat ... }     // as singleCell_O
+   }
+
+   shockTube1DCoeffs
+   {
+       diameter            0.1016;    // [m], EAST 4-inch tube
+
+       windows
+       {
+           IR  { minWavelength 740; maxWavelength 880; nPoints 14001; }
+           VUV { minWavelength 140; maxWavelength 180; nPoints 8001; }
+       }
+
+       bands                               // [nm]
+       {
+           NI_745          (742 748);
+           OI_777          (776 779);
+           NI_820          (817 826);
+           OI_845          (843.5 845.5);
+           NI_868          (861 872);
+           NI_149          (148.5 150.5);
+           NI_174          (173.5 175.5);
+       }
+
+       profile
+       {
+           source      macroFile;
+           file        "<case>/constant/profile.csv";
+       }
+
+       writeSpectra        none;
+   }
+
+Key entries:
+
+``diameter``
+   Slab thickness :math:`D` [m] of every cell.
+
+``windows``
+   One uniform grid per window (0.01 nm spacing in the IR, 0.005 nm in the
+   VUV). Each band must lie inside one window.
+
+``bands``
+   Wavelength ranges [nm] integrated per cell into ``bands.csv``.
+
+``profile``
+   The cell states (here the macro file).
+
+``writeSpectra``
+   ``none`` here; ``all`` or a list of cell indices ``(k0 k1 ...)`` writes the
+   full radiance spectra in binary (:doc:`/guide/post_processing`).
+
+The ``fromDsmcCase`` deck is identical except for the ``profile``:
+
+.. code-block:: text
+
+   profile
+   {
+       source      dsmcCase;
+       case        "../dsmcCase";
+       time        latestTime;
+       direction   x;
+
+       // dsmcVolFields names; default: n rhoN_<s>, T_trans
+       // translationalT_<s>, T_rot = T_vib = T_el internalT_<s>
+       species
+       {
+           N2 { rotationalTemperature translationalT_N2; }
+           N  { }
+           O  { }
+       }
+
+       electrons
+       {
+           numberDensity   1e+21;      // [m^-3] or a field name
+           temperature     10000;      // [K] or a field name
+       }
+   }
+
+``source dsmcCase`` reads the cell centres (component ``direction``) and the
+fields of a time directory of a *reconstructed* dsmcFoam case (a case whose
+``processor0`` holds a later time than the root stops with an error). By
+default the number density is ``rhoN_<s>``, the translational temperature
+``translationalT_<s>``, and the rotational, vibrational and electronic
+temperatures are all ``internalT_<s>``, the single temperature whose
+Boltzmann distribution over the :math:`(n,v,J)` ladder has the sampled mean
+internal energy (dsmcFoam writes no separate rotational, vibrational or
+electronic temperature). Any of the five can be mapped to another field per
+species; here the N\ :sub:`2` rotational temperature is mapped to
+``translationalT_N2`` to reproduce the macro file. The electrons are a field
+name or a constant.
+
+``dsmcCase/`` holds a ``blockMeshDict`` of 85 hexahedra along :math:`x`
+(-3.5 mm to 5 mm, one cell across, ``empty`` sides) and the time directory
+``1e-05`` with the nine fields of the profile; its ``controlDict`` names
+``dsmcFoam`` but the tutorial only runs ``blockMesh`` in it.
+
+How to run
+----------
+
+.. code-block:: bash
+
+   cd tutorials/shockTube1D
+   ./Allrun
+
+``Allrun`` runs ``blockMesh`` in ``dsmcCase`` (the mesh of the second route),
+then ``radiationFoam`` in ``macroFile`` and in ``fromDsmcCase``. ``Allclean``
+removes the outputs, the logs and ``dsmcCase/constant``. Each run takes
+seconds to tens of seconds (85 cells, 22 002 wavelengths in all).
+
+Output
+------
+
+In ``macroFile/postProcessing/radiationFoam/`` and
+``fromDsmcCase/postProcessing/radiationFoam/``:
+
+* ``bands.csv``: per cell ``k, x`` [m], the radiance integrated over each
+  band and ``window_IR``, ``window_VUV`` over each whole window
+  [W m\ :sup:`-2` sr\ :sup:`-1`];
+* ``profile.csv``: the cell states actually used (``n_e, T_e`` and per
+  species ``n_, Ttrans_, Trot_, Tvib_, Telec_``) and
+  ``emission_<window>`` = :math:`4\pi\int j_\lambda\,\mathrm{d}\lambda`
+  [W m\ :sup:`-3`].
+
+Column definitions and readers are in :doc:`/guide/post_processing`.
+
+Plotting
+--------
+
+.. code-block:: python
+
+   import pandas as pd, matplotlib.pyplot as plt
+   b = pd.read_csv('macroFile/postProcessing/radiationFoam/bands.csv',
+                   comment='#')
+   fig, ax = plt.subplots()
+   for name in ('NI_868', 'OI_777', 'NI_149'):
+       ax.semilogy(b['x']*1e3, b[name]*1e-4, label=name)   # W cm^-2 sr^-1
+   ax.set_xlabel('x (mm)'); ax.set_ylabel('Band radiance (W cm$^{-2}$ sr$^{-1}$)')
+   ax.legend(); fig.savefig('bands.png')
+
+Expected result
+---------------
+
+* Upstream of the front (cold N\ :sub:`2`, 300 K) every band is zero.
+  Behind the front the atomic bands rise by orders of magnitude within a few
+  tenths of a millimetre, with the N and O densities and the internal
+  temperatures, peak about 1.5 mm behind the front (where the internal
+  temperatures peak) and fall to a near-constant level, a few times lower,
+  towards the downstream end of the profile. (Shape seen on the full-size
+  version of the case described below; the tutorial uses the radiation
+  database and coarser grids, so its values differ.)
+* The two routes give the same result: ``bands.csv`` of ``macroFile`` and of
+  ``fromDsmcCase`` agree column by column, the cell positions to
+  :math:`10^{-16}` m. This equality was checked bit for bit on the full-size
+  version of the case (``run/RAD/shockTube1D/check_routes.txt`` of the
+  DSMC_Rovibronic repository: identical ``spectra_*.bin`` and
+  ``bands.csv``).
+
+A full-size version of this profile (80 001 and 60 001 wavelengths, the PICLas
+line files) was verified during development against PICLas ``RadType 4``,
+a past verification reference (``run/RAD/shockTube1D/compare.csv``).
+
+
+References
+----------
+
+* Johnston, C. O., *Nonequilibrium shock-layer radiative heating for Earth
+  and Titan entry*, PhD thesis, Virginia Polytechnic Institute and State
+  University, 2006.

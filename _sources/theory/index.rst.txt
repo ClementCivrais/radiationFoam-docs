@@ -1,0 +1,15 @@
+Theory Guide
+============
+
+.. toctree::
+   :maxdepth: 2
+
+   foundations
+   populations
+   atomic_lines
+   diatomic_bands
+   line_shapes
+   continuum
+   transport
+   instrument
+   database

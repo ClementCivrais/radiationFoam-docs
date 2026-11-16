@@ -1,0 +1,468 @@
+Adding a Feature
+================
+
+New physics enters radiationFoam as a new model of one of the run-time
+selected families (:doc:`architecture`): a radiator, a line shape, a
+population model, a continuum process, a transport mode or an instrument
+function. The recipe is the same for all of them:
+
+#. create ``<family>/derived/<newModel>/<newModel>.{H,C}``, derived from
+   the base class of the family;
+#. give it a ``TypeName`` (the name users type in the dictionary) and
+   register it with ``addToRunTimeSelectionTable``;
+#. implement the pure virtual member functions of the base;
+#. read its own dictionary entries in its constructor, and list them in
+   the header ``Description`` (the header is the reference for the
+   documentation);
+#. add the ``.C`` file(s) to ``src/radiation/Make/files`` in the group of
+   its family;
+#. rebuild (``./Allwmake``), add a case or test that exercises it, and
+   check that the existing outputs are unchanged (:doc:`tests`);
+#. document the new keywords in :doc:`input_reference` and the class in
+   :doc:`/classes/index`.
+
+No change of ``radiationFoam.C`` or of the base class is needed: the
+selector finds the new model by name in the run-time table.
+
+Conventions
+-----------
+
+* **Style.** Follow the existing classes: the full OpenFOAM licence header,
+  ``Class``, ``Description`` (equations in plain text, units, the
+  dictionary in a ``\verbatim`` block) and ``SourceFiles`` sections; the
+  equations of a model written inline in its own files (no shared helper
+  namespaces).
+* **Plain data.** Library classes must not include DSMC cloud or parcel
+  headers; they receive everything through ``radiationCellState``,
+  ``radiationLevels`` and ``spectralGrid``.
+* **SI inside.** Wavelengths are stored in m, energies in J; convert input
+  units once, in the constructor.
+* **Fail loudly.** An invalid entry is a ``FatalIOErrorInFunction(dict)``
+  with a one-line message that names the entry and the valid values. Never
+  ignore an entry silently.
+* **Every datum referenced.** Physical constants and data come from a cited
+  source (in the header or in ``database/SOURCES.md``); no tunable
+  parameters.
+* **Basename.** No two files of the library may share a basename
+  (``wmake`` links them all into one ``lnInclude``).
+
+Adding a line shape
+-------------------
+
+A line shape distributes one line, centred at :math:`\lambda_0` with the
+Lorentz and Gauss full widths at half maximum, onto the grid. The contract
+(``lineShapes/basic/lineShapeModel/lineShapeModel.H``): fill
+``profile[iStart..iEnd]`` [m\ :sup:`-1`] with the profile integral over each
+point's bin divided by :math:`\Delta\lambda`, so that
+:math:`\sum_i \phi_i\,\Delta\lambda=1` for a line inside the window; the bin
+of point :math:`i` is :math:`(\lambda_{i-1},\lambda_i]`. Return ``false``
+when the line misses the grid. ``profile`` is a field of the grid size
+owned by the caller; only ``[iStart, iEnd]`` is read.
+
+``lineShapes/derived/gaussianLine/gaussianLine.H``:
+
+.. code-block:: c++
+
+   #ifndef gaussianLine_H
+   #define gaussianLine_H
+
+   #include "lineShapeModel.H"
+
+   namespace Foam
+   {
+
+   class gaussianLine
+   :
+       public lineShapeModel
+   {
+   public:
+
+       //- Runtime type information
+       TypeName("gaussianLine");
+
+       //- Construct from dictionary
+       explicit gaussianLine(const dictionary& dict);
+
+       //- Destructor
+       virtual ~gaussianLine() = default;
+
+       //- Fill profile[iStart..iEnd] [m^-1] for one line
+       virtual bool lineProfile
+       (
+           const scalar lambda0,
+           const scalar widthLorentz,
+           const scalar widthDoppler,
+           const spectralGrid& grid,
+           scalarField& profile,
+           label& iStart,
+           label& iEnd
+       ) const;
+   };
+
+   } // End namespace Foam
+
+   #endif
+
+``lineShapes/derived/gaussianLine/gaussianLine.C``:
+
+.. code-block:: c++
+
+   #include "gaussianLine.H"
+   #include "mathematicalConstants.H"
+   #include "addToRunTimeSelectionTable.H"
+
+   namespace Foam
+   {
+       defineTypeNameAndDebug(gaussianLine, 0);
+
+       addToRunTimeSelectionTable(lineShapeModel, gaussianLine, dictionary);
+   }
+
+   Foam::gaussianLine::gaussianLine(const dictionary& dict)
+   :
+       lineShapeModel(dict)
+   {}
+
+   bool Foam::gaussianLine::lineProfile
+   (
+       const scalar lambda0,
+       const scalar widthLorentz,
+       const scalar widthDoppler,
+       const spectralGrid& grid,
+       scalarField& profile,
+       label& iStart,
+       label& iEnd
+   ) const
+   {
+       // Gaussian of full width widthDoppler; cumulative
+       // C(x) = (1 + erf(x/(sqrt(2) sigma)))/2, cut at 6 sigma
+       const scalar sigma = widthDoppler/(2*sqrt(2*log(2.0)));
+       const scalar R = 6*sigma;
+       const scalar dL = grid.dLambda();
+
+       iStart = max(label(0), label(std::floor((lambda0 - R - grid.lambdaMin())/dL)));
+       iEnd = min(grid.size() - 1, label(std::ceil((lambda0 + R - grid.lambdaMin())/dL)) + 1);
+
+       if (iStart > iEnd)
+       {
+           return false;
+       }
+
+       auto C = [&](const scalar l)
+       {
+           return 0.5*(1 + erf((l - lambda0)/(sqrt(2.0)*sigma)));
+       };
+
+       for (label i = iStart; i <= iEnd; ++i)
+       {
+           const scalar hi = grid.lambda()[i];
+           profile[i] = (C(hi) - C(hi - dL))/dL;      // bin (lambda_{i-1}, lambda_i]
+       }
+
+       return true;
+   }
+
+``Make/files``, in the ``lineShapes`` group:
+
+.. code-block:: text
+
+   lineShapes/derived/gaussianLine/gaussianLine.C
+
+Select it per atomic species with ``lineShape gaussianLine;`` in
+``atomicLinesCoeffs``. The skeleton ignores ``widthLorentz``: a real model
+must say in its header which widths it uses. Note that ``diatomicBands``
+does not use the ``lineShapeModel`` family (it builds its own Voigt table
+per vibrational transition), so a new line shape changes atomic lines only.
+
+Adding a population model
+-------------------------
+
+A population model returns, for one species and one cell, the number
+density [m\ :sup:`-3`] of every level the radiator asks for
+(``radiationLevels``), the bound limit (the energy above which levels are
+not bound; ``GREAT`` for none) and the temperature used by the Stark width.
+Coefficients come from ``<TypeName>Coeffs`` of ``radiationProperties``,
+available as ``coeffs_`` (empty if absent).
+
+.. code-block:: c++
+
+   // populations/derived/electronicBoltzmann/electronicBoltzmann.H
+   class electronicBoltzmann
+   :
+       public radiationPopulationModel
+   {
+   public:
+
+       TypeName("electronicBoltzmann");
+
+       explicit electronicBoltzmann(const dictionary& dict);
+
+       virtual ~electronicBoltzmann() = default;
+
+       virtual bool levelPopulations
+       (
+           const radiationLevels& levels,
+           const radiationCellState& state,
+           const label speciesi,
+           scalarList& nLevel,
+           scalar& boundEnergy
+       ) const;
+
+       virtual scalar electronTemperature
+       (
+           const radiationCellState& state,
+           const label speciesi
+       ) const;
+   };
+
+.. code-block:: c++
+
+   // populations/derived/electronicBoltzmann/electronicBoltzmann.C
+   #include "electronicBoltzmann.H"
+   #include "physicoChemicalConstants.H"
+   #include "addToRunTimeSelectionTable.H"
+
+   namespace Foam
+   {
+       defineTypeNameAndDebug(electronicBoltzmann, 0);
+
+       addToRunTimeSelectionTable
+       (
+           radiationPopulationModel,
+           electronicBoltzmann,
+           dictionary
+       );
+   }
+
+   Foam::electronicBoltzmann::electronicBoltzmann(const dictionary& dict)
+   :
+       radiationPopulationModel(dict, typeName)   // coeffs_ = electronicBoltzmannCoeffs
+   {}
+
+   bool Foam::electronicBoltzmann::levelPopulations
+   (
+       const radiationLevels& levels,
+       const radiationCellState& state,
+       const label speciesi,
+       scalarList& nLevel,
+       scalar& boundEnergy
+   ) const
+   {
+       const scalar k = constant::physicoChemical::k.value();
+       const scalar T = state.Telec[speciesi];
+
+       nLevel.setSize(levels.size());
+       nLevel = Zero;
+       boundEnergy = GREAT;                       // no lowering in this sketch
+
+       if (!(T > 0) || !(state.numberDensity[speciesi] > 0))
+       {
+           return false;                          // species does not radiate here
+       }
+
+       // n_i = n g_i exp(-E_i/kT)/Q over the levels of the radiator
+       scalar Q = 0;
+       forAll(nLevel, i)
+       {
+           nLevel[i] = levels.g[i]*exp(-levels.E[i]/(k*T));
+           Q += nLevel[i];
+       }
+       nLevel *= state.numberDensity[speciesi]/Q;
+
+       return true;
+   }
+
+   Foam::scalar Foam::electronicBoltzmann::electronTemperature
+   (
+       const radiationCellState& state,
+       const label speciesi
+   ) const
+   {
+       return state.Telectron > 0 ? state.Telectron : state.Telec[speciesi];
+   }
+
+Optional overrides of the base class: ``lineLowerPopulation`` (the lower
+population a diatomic line absorbs from), ``emissionSelectsLines`` (line
+selection of ``diatomicBands``), and ``modelsLevels`` with the second
+``levelPopulations`` and ``recordModelledEmission`` (report of the
+emission carried by modelled levels, as ``cellDistribution`` does with
+``boltzmannFill``). Select the model with ``populationModel
+electronicBoltzmann;``.
+
+Adding a radiator
+-----------------
+
+A radiator owns the spectroscopic data of one species. Its constructor
+reads ``<TypeName>Coeffs`` (``coeffs_``; the base class has already read
+``mass`` and ``radius``) and builds the level list and the line list once.
+It must provide
+
+* ``levels()``: the ``radiationLevels`` whose populations it needs (set
+  ``species``, ``molecular``, ``term`` (and ``v``, ``J`` for a molecule),
+  ``g``, ``E``, ``ionisationEnergy``);
+* ``addEmissionAbsorption(grid, populations, state, speciesi, emission,
+  absorption)``: ask the population model for ``nLevel`` and add
+  :math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and
+  :math:`\kappa_\lambda` [m\ :sup:`-1`] (net of stimulated emission) to the
+  two fields.
+
+.. code-block:: c++
+
+   // radiators/derived/myRadiator/myRadiator.H
+   class myRadiator
+   :
+       public radiatingSpecies
+   {
+       radiationLevels levels_;
+       // line data: wavelengths, lower/upper level indices, A, ...
+
+   public:
+
+       TypeName("myRadiator");
+
+       myRadiator(const word& name, const dictionary& dict);
+
+       virtual ~myRadiator() = default;
+
+       virtual const radiationLevels& levels() const { return levels_; }
+
+       virtual void addEmissionAbsorption
+       (
+           const spectralGrid& grid,
+           const radiationPopulationModel& populations,
+           const radiationCellState& state,
+           const label speciesi,
+           scalarField& emission,
+           scalarField& absorption
+       ) const;
+   };
+
+.. code-block:: c++
+
+   // radiators/derived/myRadiator/myRadiator.C
+   namespace Foam
+   {
+       defineTypeNameAndDebug(myRadiator, 0);
+       addToRunTimeSelectionTable(radiatingSpecies, myRadiator, dictionary);
+   }
+
+   Foam::myRadiator::myRadiator(const word& name, const dictionary& dict)
+   :
+       radiatingSpecies(name, dict, typeName),     // coeffs_ = myRadiatorCoeffs
+       levels_()
+   {
+       const fileName file(coeffs_.get<fileName>("transitionFile").expand());
+       // read the file, fill levels_ and the line arrays
+   }
+
+   void Foam::myRadiator::addEmissionAbsorption(...) const
+   {
+       scalarList nLevel;
+       scalar boundEnergy;
+
+       if (!populations.levelPopulations(levels_, state, speciesi, nLevel, boundEnergy))
+       {
+           return;
+       }
+       // per line: strength from nLevel, widths from state,
+       // profile placed as bin integrals (see lineShapeModel), then
+       // emission[i] += ...; absorption[i] += ...;
+   }
+
+Select it with ``model myRadiator;`` and a ``myRadiatorCoeffs``
+sub-dictionary in ``species/<s>``. If the new radiator is to work with
+``cellDistribution``, its level keys must match the keys the DSMC writes
+(:doc:`dsmcfoam_coupling`).
+
+Adding an instrument function
+-----------------------------
+
+An instrument function is a normalised kernel :math:`K(s)`. The base class
+does the convolution on any grid; a model provides only its cumulative
+distribution :math:`C(s)`, either analytically (override ``cdf``,
+``pdf``, ``support``) or, simplest, as a piecewise-linear density on nodes
+passed to ``setTable`` in the constructor, for which the base computes the
+exact cumulative distribution. ``width()`` (a characteristic full width) is
+the only pure virtual function. Lengths are read with ``readLength`` /
+``readLengthOrDefault``, which apply ``lengthUnit``. The pattern of
+``instrumentTrapezoid``:
+
+.. code-block:: c++
+
+   // instrument/instrumentFunctions/derived/instrumentTriangle/instrumentTriangle.C
+   #include "instrumentTriangle.H"
+   #include "addToRunTimeSelectionTable.H"
+
+   namespace Foam
+   {
+       defineTypeNameAndDebug(instrumentTriangle, 0);
+       addToRunTimeSelectionTable(instrumentFunction, instrumentTriangle, dictionary);
+   }
+
+   Foam::instrumentTriangle::instrumentTriangle(const dictionary& dict)
+   :
+       instrumentFunction(dict),
+       base_(readLength("baseWidth"))              // in lengthUnit, stored in m
+   {
+       if (!(base_ > 0))
+       {
+           FatalIOErrorInFunction(dict)
+               << "triangle needs baseWidth > 0" << exit(FatalIOError);
+       }
+
+       // density on the nodes (any scale: the table is normalised)
+       setTable
+       (
+           List<scalar>({-0.5*base_, 0.0, 0.5*base_}),
+           List<scalar>({0.0, 1.0, 0.0})
+       );
+   }
+
+   Foam::scalar Foam::instrumentTriangle::width() const
+   {
+       return base_;
+   }
+
+with ``TypeName("triangle");`` in the header, and in ``Make/files``:
+
+.. code-block:: text
+
+   instrument/instrumentFunctions/derived/instrumentTriangle/instrumentTriangle.C
+
+The new type is then available everywhere an instrument function is read
+(``spectralResponse``, ``spatialResponse``, members of ``composite``,
+``function`` of the test application). Add a ``kernel`` and a ``convolve``
+test to ``tutorials/instrumentTests/run_tests.py`` with an analytic
+reference (:doc:`tests`).
+
+Adding a continuum process or a transport mode
+----------------------------------------------
+
+The same pattern applies:
+
+* **Continuum process.** Derive from ``continuumModel`` (constructor
+  ``(const PtrList<radiatingSpecies>& species, const label speciesi, const
+  dictionary& dict)``, coefficients in ``continuumCoeffs``), implement
+  ``addEmissionAbsorption(grid, populations, state, emission, absorption)``
+  and register in the ``continuumModel`` table. ``continuumProcesses``
+  decides which processes exist from the entry ``continuum``: a new
+  process also needs a new value of ``continuum`` (or a new rule) in
+  ``continuumProcesses.C``.
+* **Transport mode.** Derive from ``radiationTransportModel`` (constructor
+  ``(runTime, radiationProperties, species, populations, continuum)``),
+  implement ``solve()``: read the mode's own sub-dictionary, build the
+  spectral grid(s) and the cell states, call
+  ``species[i].addEmissionAbsorption`` and
+  ``continuum.addEmissionAbsorption`` per cell, transfer, and write to
+  ``postProcessing/radiationFoam``. Selected by ``mode``. The 2-D and 3-D
+  modes designed in ``docs/RADIATION_COUPLING_SPEC.md`` would enter here.
+
+Checklist before committing
+---------------------------
+
+* ``./Allwmake`` builds with no new warning.
+* The tutorials and the instrument suite give unchanged outputs unless the
+  change is meant to change them (:doc:`tests`).
+* The new model has a verification case against an analytic or
+  independent baseline, with a figure (red present, black baseline).
+* Keywords documented in the header and in :doc:`input_reference`.

@@ -1,0 +1,201 @@
+Population models
+=================
+
+Source: ``src/radiation/populations/``.
+
+A population model gives, for each radiating species and cell, the number
+density [m\ :sup:`-3`] of every spectroscopic level the radiator needs::
+
+    populations/
+        basic/radiationPopulationModel/    abstract base, selector
+        derived/boltzmannTemperatures/     Boltzmann re-expansion from the
+                                           species temperatures
+        derived/cellDistribution/          the cell's sampled n(n,v,J)
+
+Theory: :doc:`/theory/populations`.
+
+radiationPopulationModel (base class)
+-------------------------------------
+
+``src/radiation/populations/basic/radiationPopulationModel/radiationPopulationModel{,New}.{H,C}``
+
+Selected by the top-level entry ``populationModel`` of
+``system/radiationProperties``; the optional sub-dictionary
+``<model>Coeffs`` holds its coefficients (empty if absent).
+
+.. code-block:: cpp
+
+   populationModel     cellDistribution;     // or boltzmannTemperatures
+   cellDistributionCoeffs { missingLevels boltzmannFill; }   // optional
+
+Interface (all ``const``; plain data only, no cloud or parcel headers):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Member function
+     - Purpose
+   * - ``levelPopulations(levels, state, i, nLevel, boundEnergy)``
+     - number density of each level of species :math:`i` and the bound
+       limit :math:`E_b` [J]; returns false if the species does not radiate
+       in this cell (pure virtual)
+   * - ``levelPopulations(..., modelled)``
+     - the same, plus ``modelled[i]`` = true for the levels whose
+       population is modelled rather than taken from the cell state
+       (default: none)
+   * - ``modelsLevels()``
+     - true if the model may return modelled levels (default false: the
+       radiators then do no extra work)
+   * - ``emissionSelectsLines()``
+     - true if a diatomic line is placed only when its emission passes the
+       threshold (default false: a line can be placed for its absorption
+       alone)
+   * - ``recordModelledEmission(...)``
+     - hook through which the radiators report, per call, the integrated
+       emission of the lines with a modelled upper level and of all lines
+       (default: nothing)
+   * - ``electronTemperature(state, i)``
+     - temperature of the free electrons seen by the Stark width [K] (pure
+       virtual)
+   * - ``lineLowerPopulation(levels, state, i, nLevel, upper, lower, dEel,
+       dEvib, dErot)``
+     - :math:`n_l/g_l` of a diatomic line as seen by the absorption
+       (default: ``nLevel[lower]/g[lower]``)
+
+boltzmannTemperatures
+---------------------
+
+``src/radiation/populations/derived/boltzmannTemperatures/boltzmannTemperatures.{H,C}``
+
+Run-time name: ``boltzmannTemperatures``. Dictionary entries: none.
+
+Reads per species ``numberDensity``, ``Telec``, and for diatomics ``Tvib``,
+``Trot`` of the cell state, plus ``electronNumberDensity``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Function
+     - Behaviour
+   * - ``levelPopulations`` (atom)
+     - Debye-Hückel lowering at the cell :math:`T_e` (else the species
+       :math:`T_{\mathrm{el}}`, none if neither is positive; base-class
+       ``boundLimit``), level cut at the last level below :math:`E_b` (also for
+       :math:`n_e = 0`; all levels if ``ionisationEnergy`` :math:`\le 0`),
+       Boltzmann at :math:`T_{\mathrm{el}}` over the kept levels;
+       :math:`T_{\mathrm{el}} \le 0`: all atoms in the lowest kept
+       level(s); false if no level is bound
+   * - ``levelPopulations`` (diatomic)
+     - separable Boltzmann at :math:`(T_{\mathrm{el}}, T_{\mathrm{vib}},
+       T_{\mathrm{rot}})` with the partition function over every state of
+       the molecule file; false (and a warning once per species) if
+       :math:`T_{\mathrm{vib}} < 10` K; fatal if
+       :math:`T_{\mathrm{rot}} \le 0`; :math:`E_b` = GREAT
+   * - ``electronTemperature``
+     - the species :math:`T_{\mathrm{el}}` (``atomicLines`` uses it for the
+       Stark width when the cell gives no :math:`T_e`)
+   * - ``emissionSelectsLines``
+     - true
+   * - ``lineLowerPopulation``
+     - diatomic: :math:`(n_u/g_u)\exp(\Delta E_{\mathrm{el}}/k
+       T_{\mathrm{el}} + \Delta E_{\mathrm{vib}}/kT_{\mathrm{vib}} + \Delta
+       F/kT_{\mathrm{rot}})` with the line's term differences; atom:
+       :math:`n_l/g_l`
+
+cellDistribution
+----------------
+
+``src/radiation/populations/derived/cellDistribution/cellDistribution.{H,C}``
+
+Run-time name: ``cellDistribution``. Takes the populations from the level
+distribution of the cell state (``radiationCellState::distributionIds``,
+``distributionN``, ``distributionG``, coverage), read from a distribution
+file written by the dsmcFoam function object
+``dsmcRadiationDistribution``. The file is named by the transport model:
+``cellState { distributionFile ...; }`` in ``singleCell``,
+``shockTube1DCoeffs { distribution { directory ...; direction x; } }`` in
+``shockTube1D`` (:doc:`transport`).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 30 36
+
+   * - Keyword (``cellDistributionCoeffs``)
+     - Type
+     - Default
+     - Meaning
+   * - ``missingLevels``
+     - word
+     - ``zero``
+     - ``zero``: levels covered by no entry get 0; ``boltzmannFill``: they
+       get the Boltzmann population at the species :math:`T_{\mathrm{el}}`
+       (levels the DSMC ladder does not carry only, when the file gives a
+       coverage)
+   * - ``fillReport``
+     - fileName
+     - ``<case>/postProcessing/``
+       ``radiationFoam/``
+       ``cellDistributionFill.csv``
+     - CSV file of the fill diagnostics (``boltzmannFill`` only)
+
+.. code-block:: cpp
+
+   populationModel     cellDistribution;
+
+   cellDistributionCoeffs
+   {
+       missingLevels   boltzmannFill;
+       fillReport      "<case>/postProcessing/radiationFoam/cellDistributionFill.csv";
+   }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Function
+     - Behaviour
+   * - ``levelPopulations``
+     - map every entry onto the levels with its keys (atom: the listed
+       labels; diatomic: "state v J"), split by :math:`g_i/\sum g_j`, or by
+       :math:`g_i/g_D` when the DSMC weight :math:`g_D` is larger; bound
+       limit with :math:`T_e` of the cell (or :math:`T_{\mathrm{el}}`, or
+       no lowering); fill the absent levels (``boltzmannFill``); write the
+       mapping report once per species
+   * - ``modelsLevels``
+     - true with ``boltzmannFill``
+   * - ``emissionSelectsLines``
+     - false (base default): a line with an empty upper level is placed for
+       its absorption
+   * - ``recordModelledEmission``
+     - append one CSV row per radiator call (``boltzmannFill``) and update
+       the summary per species and window
+   * - ``electronTemperature``
+     - :math:`T_e` of the cell, else :math:`\max(0, T_{\mathrm{el}})` of
+       the species
+   * - destructor
+     - writes the fill summary to the log (``boltzmannFill``)
+
+Fatal errors: a radiating species absent from the distribution file; a
+diatomic entry that is not (state :math:`v` :math:`J`); an entry matching
+no level (except a diatomic entry of a known state whose :math:`(v,J)` has
+no line, which is skipped and counted); a level covered by two entries;
+``missingLevels`` other than ``zero`` or ``boltzmannFill``;
+``boltzmannFill`` with :math:`T_{\mathrm{el}} < 10` K in the cell state.
+A distribution without a ``coverage`` entry with ``boltzmannFill`` gives a
+warning once per species (every absent level is then filled).
+
+Outputs:
+
+* log, once per species: entries, levels, sum of the populations against
+  :math:`n_s`, absent levels (count and keys), entries outside the level
+  set, entries split by the DSMC weight and the density on states without
+  a spectroscopic level, and with ``boltzmannFill`` the number of filled
+  levels and their population;
+* ``fillReport`` CSV (``boltzmannFill``), header
+  ``cell,species,lambdaMin_nm,lambdaMax_nm,levels,sampled_entries,filled_levels,filled_population_fraction,j_filled,j_total,filled_emission_fraction``;
+* log at the end (``boltzmannFill``): per species and window the number of
+  rows, the range of filled levels, the aggregate filled share
+  :math:`\sum j_{\mathrm{filled}}/\sum j_{\mathrm{total}}` and its
+  maximum.

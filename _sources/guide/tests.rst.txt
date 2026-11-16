@@ -1,0 +1,195 @@
+Tests
+=====
+
+radiationFoam is checked at two levels: a unit-test application for the
+instrument model, with an automatic comparison against analytic results,
+and the tutorials, whose outputs serve as regression references. The
+present page explains how to run both and what must stay identical after a
+code change. The history of the verification (what was compared with what,
+and the outcome) is in :doc:`/reference/verification`.
+
+The instrument test suite
+-------------------------
+
+``Test-radiationInstrument``
+(``applications/test/radiationInstrument``) is a driver of the instrument
+classes (``instrumentFunction`` and its seven types, and
+``shockTubeInstrument``). It reads a test dictionary (option ``-dict``,
+default ``system/instrumentTests``) and runs its tests in order; the five
+test kinds (``convolve``, ``kernel``, ``band``, ``front``, ``measure``) are
+listed in :doc:`input_reference`. It does not judge the results: it writes
+them.
+
+The judging is done by ``tutorials/instrumentTests/run_tests.py``. It
+
+#. writes the inputs (``cases/``) and the test dictionary
+   (``system/instrumentTests``);
+#. runs ``Test-radiationInstrument``;
+#. compares every output with an analytic result or an independent Python
+   transcription, averaged over the same bins as the library (the library
+   returns bin averages of the convolution, so the references are exact
+   antiderivatives averaged over each bin, not point samples);
+#. writes ``summary.csv`` (test, quantity, value, tolerance, pass) and the
+   figures (``figures/``, PDF and PNG: present results as red markers,
+   analytic references as black lines).
+
+Run it with the library built and Python 3 with numpy, scipy and
+matplotlib:
+
+.. code-block:: bash
+
+   cd tutorials/instrumentTests
+   ./Allrun        # prints: checks: 45 pass, 0 fail (summary.csv)
+   ./Allclean      # removes cases, output, figures, system, summary.csv, logs
+
+What the 45 checks cover (names as in ``summary.csv``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Tests
+     - Check
+   * - ``T1_gauss_gauss_*``
+     - Gaussian kernel on a Gaussian signal, uniform and non-uniform
+       grids: against the analytic convolution; integral conserved to
+       1e-12
+   * - ``T2a``-``T2d``
+     - top-hat on a Gaussian profile, composite kernels on a delta and on
+       top-hats (two table resolutions), top-hat on a step: against the
+       analytic results (tolerances 2e-5 to 1e-3)
+   * - ``T3_delta_*``
+     - a delta line through each line-shape kernel (Gaussian, trapezoid,
+       Voigt exact and pseudo-Voigt, EAST sqrt-Voigt and Gauss-Lorentz, an
+       asymmetric tabulated function): the output must be the bin-averaged
+       kernel
+   * - ``T4_edge_conserve_*``
+     - a line 0.3 nm from the window edge, ``conserveAtEdges`` true and
+       false: window integral conserved, or equal to the analytic mass left
+       in the window
+   * - ``T6_band_*``
+     - band integrals on a non-uniform grid (a line, the whole window, a
+       narrow band, a wing): against the integral of the linear
+       interpolant and the exact integral
+   * - ``T7_rise``, ``T7_peak``
+     - shock-front criteria on a logistic rise and a peaked profile:
+       ``riseFraction``, ``maxGradient`` and ``peakRadiance`` within 2e-5 m
+       of the analytic front
+   * - ``T8_*``
+     - the whole measurement pipeline (``measure``) on a field with an
+       analytic answer: field to 1e-8 of its maximum, band profiles to
+       2e-3, front to 1e-6 m
+
+A run passes when every row of ``summary.csv`` ends in ``True``.
+
+Tutorial-based checks
+---------------------
+
+The tutorials (:doc:`/examples/index`) are small and fast; each has
+``Allrun`` and ``Allclean``. They exercise every transport mode, both
+population routes, the continuum and the instrument.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 45 25
+
+   * - Tutorial
+     - What it exercises
+     - Run time (README)
+   * - ``singleCell_N``, ``singleCell_O``
+     - ``atomicLines``, ``boltzmannTemperatures``, ``singleCell``
+     - < 1 s
+   * - ``shockTube1D``
+     - ``diatomicBands`` and ``atomicLines``, ``shockTube1D`` on the same
+       profile read from a macro file (``macroFile``) and from the fields
+       of a dsmcFoam case (``fromDsmcCase``)
+     - 40 s
+   * - ``EAST/equilibrium``
+     - all air radiators, ``continuum physical``, the instrument of each
+       EAST shot; ``Allrun`` runs one case per camera, ``./Allrun full
+       all`` all 50
+     - 1 min
+   * - ``EAST/east5029``
+     - ``cellDistribution`` on a dsmcFoam run; needs ``DSMC_CASE``
+     - hours (``STRIDE=10``: 20 s)
+   * - ``instrumentTests``
+     - the suite above
+     - 5 s
+
+Two internal consistency checks come with ``shockTube1D``: the two routes
+read the same profile, so ``macroFile/postProcessing`` and
+``fromDsmcCase/postProcessing`` must agree (the top-level ``README.md``
+states 1e-13); and every band of ``bands.csv`` must lie inside its window
+(checked by the code at start-up).
+
+Which outputs must stay identical
+---------------------------------
+
+Every structural change of the code (moves, renames, file splits, new
+models that are not selected by the existing cases) must leave the outputs
+of the existing cases **bit-identical**. The gates used for the
+restructure of 2026-11-14 and the library review of 2026-11-15
+(``docs/RADIATION_RESTRUCTURE.md`` section 4, commit messages
+``9ea3d42`` and ``be594a5``) are the model:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 12 88
+
+   * - Gate
+     - Requirement
+   * - G1
+     - Every file of ``postProcessing/radiationFoam`` of every regression
+       case is md5-identical between the build before and after the
+       change.
+   * - G3
+     - The instrument suite passes (45 of 45) and its outputs are
+       identical.
+   * - G4 / G6
+     - Clean build of the library and the applications, no new compiler
+       warning.
+   * - G5
+     - The EAST equilibrium cases: band ratios unchanged.
+
+A physics change is the opposite case: it must change exactly the cases
+that use the changed model and no other. For example, in the library
+review of 2026-11-15 (commit ``3153f7a``), the new band strengths changed
+exactly the 51 regression cases with a ``diatomicBands`` radiator and the
+new atomic widths exactly the 68 with an ``atomicLines`` radiator. Report
+the size of the change (spectra, band integrals) with the commit.
+
+Running an md5 regression
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   # 1. reference outputs with the current build
+   for c in singleCell_N singleCell_O shockTube1D; do
+       (cd tutorials/$c && ./Allclean && ./Allrun)
+   done
+   (cd tutorials/EAST/equilibrium && ./Allclean && ./Allrun)
+   find tutorials -path '*postProcessing/radiationFoam/*' -type f \
+        -exec md5sum {} + | sort -k2 > /path/to/md5_before.txt
+
+   # 2. rebuild with the change, run again
+   ./Allwmake
+   ...                               # same loop as above
+   find tutorials -path '*postProcessing/radiationFoam/*' -type f \
+        -exec md5sum {} + | sort -k2 > /path/to/md5_after.txt
+
+   # 3. compare
+   diff /path/to/md5_before.txt /path/to/md5_after.txt && echo "G1 pass"
+
+Keep the reference files outside the repository. ``log.*``,
+``postProcessing/`` and ``*.bin`` are ignored by git (``.gitignore``).
+
+Verification sets
+-----------------
+
+The comparisons that established the library (against an independent
+Python transcription of the formulas, analytic limits, and the history
+against PICLas) were run in the DSMC_Rovibronic repository (``run/RAD/``),
+where the dated reports are kept. The ``verification/`` directory of the
+radiationFoam repository is being populated with the Python references and committed
+reference outputs of these sets; its ``README.md`` gives, for each set, the
+command, the expected result and the report.

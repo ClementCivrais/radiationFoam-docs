@@ -1,0 +1,625 @@
+Diatomic band systems, line by line
+===================================
+
+A diatomic molecule radiates in band systems. An electronic transition
+:math:`n' \to n''` (a *system*, e.g. the N\ :sub:`2` first positive
+system B\ :sup:`3`\ :math:`\Pi_g` :math:`\to` A\ :sup:`3`\ :math:`\Sigma_u^+`)
+splits into vibrational bands :math:`(v', v'')`, and each band into
+rotational lines :math:`J' \to J''` grouped in branches. The radiator
+``diatomicBands`` (``src/radiation/radiators/derived/diatomicBands``)
+computes every rotational line of every band of a molecule file
+explicitly: its position, its strength and the levels it connects. The
+line list is built once at construction (``diatomicBandsRead.C`` reads the
+file, ``diatomicBandsLines.C`` builds lines and levels); per cell only the
+populations, widths and line placement are evaluated (``diatomicBands.C``).
+Class and keywords: :doc:`/classes/radiators`.
+
+The rovibronic levels are :math:`(n, v, J)`, the same identification as the
+DSMC ladders of dsmcFoam, so the populations of the levels can come either
+from temperatures or from the sampled distribution
+(:doc:`/theory/populations`).
+
+Systems in the database
+-----------------------
+
+``src/radiation/database/molecules`` holds four molecule files
+(:doc:`/theory/database`). Every band of a file is computed; there is no
+band selection in the dictionary.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 12 16 34 10 28
+
+   * - File
+     - Band
+     - System, upper :math:`\to` lower
+     - Type
+     - Data
+   * - ``N2.dat``
+     - ``N21p``
+     - first positive, B :sup:`3`\ :math:`\Pi_g \to` A :sup:`3`\ :math:`\Sigma_u^+`
+     - 2
+     - IPAC (Laher and Espy)
+   * -
+     - ``N22p``
+     - second positive, C :sup:`3`\ :math:`\Pi_u \to` B :sup:`3`\ :math:`\Pi_g`
+     - 6
+     - IPAC
+   * -
+     - ``N2bh2``
+     - Birge-Hopfield II, b' :sup:`1`\ :math:`\Sigma_u^+ \to` X
+     - 1
+     - PARADE N2ihl
+   * -
+     - ``N2bh``
+     - Birge-Hopfield, b :sup:`1`\ :math:`\Pi_u \to` X
+     - 2
+     - PARADE N2ihl
+   * -
+     - ``N2lbh``
+     - Lyman-Birge-Hopfield, a :sup:`1`\ :math:`\Pi_g \to` X
+     - 2
+     - PARADE N2ihl
+   * -
+     - ``N2cy``
+     - Carroll-Yoshino, c'\ :sub:`4` :sup:`1`\ :math:`\Sigma_u^+ \to` X
+     - 1
+     - PARADE N2ihl
+   * -
+     - ``N2wj``
+     - Worley-Jenkins, c\ :sub:`3` :sup:`1`\ :math:`\Pi_u \to` X
+     - 2
+     - PARADE N2ihl
+   * -
+     - ``N2w``
+     - Worley, o\ :sub:`3` :sup:`1`\ :math:`\Pi_u \to` X
+     - 2
+     - PARADE N2ihl
+   * - ``N2plus.dat``
+     - ``N2p1n``
+     - first negative, B :sup:`2`\ :math:`\Sigma_u^+ \to` X :sup:`2`\ :math:`\Sigma_g^+`
+     - 4
+     - IPAC
+   * -
+     - ``N2pMeinel``
+     - Meinel, A :sup:`2`\ :math:`\Pi_u \to` X :sup:`2`\ :math:`\Sigma_g^+`
+     - 3
+     - IPAC
+   * - ``NO.dat``
+     - ``NOgamma``
+     - :math:`\gamma`, A :sup:`2`\ :math:`\Sigma^+ \to` X :sup:`2`\ :math:`\Pi`
+     - 3
+     - IPAC
+   * -
+     - ``NObeta``
+     - :math:`\beta`, B :sup:`2`\ :math:`\Pi \to` X :sup:`2`\ :math:`\Pi`
+     - 5
+     - IPAC
+   * -
+     - ``NOdelta``
+     - :math:`\delta`, C :sup:`2`\ :math:`\Pi \to` X :sup:`2`\ :math:`\Pi`
+     - 5
+     - IPAC
+   * -
+     - ``NOepsilon``
+     - :math:`\epsilon`, D :sup:`2`\ :math:`\Sigma^+ \to` X :sup:`2`\ :math:`\Pi`
+     - 3
+     - Laux (1993)
+   * -
+     - ``NObetaprime``
+     - :math:`\beta'`, B' :sup:`2`\ :math:`\Delta \to` X :sup:`2`\ :math:`\Pi`
+     - 2
+     - Laux (1993)
+   * -
+     - ``NOgammaprime``
+     - :math:`\gamma'`, E :sup:`2`\ :math:`\Sigma^+ \to` X :sup:`2`\ :math:`\Pi`
+     - 3
+     - Laux (1993)
+   * - ``O2.dat``
+     - ``O2SR``
+     - Schumann-Runge, B :sup:`3`\ :math:`\Sigma_u^- \to` X :sup:`3`\ :math:`\Sigma_g^-`
+     - 1
+     - IPAC
+
+The **transition type** (1 to 6) selects the rotational structure: the
+term-value formulas and the Hoenl-London factors. It is chosen from the
+term symbols of the two states (section "Rotational structure" below).
+
+Data of a molecule file
+-----------------------
+
+Per electronic state, 17 constants: :math:`g_e`, :math:`T_e`, :math:`D_0`,
+:math:`\omega_e`, :math:`\omega_e x_e`, :math:`\omega_e y_e`,
+:math:`\omega_e z_e`, :math:`B_e`, :math:`\alpha_e`, :math:`\mu`,
+``nuspin``, ``altnat``, :math:`D_e`, :math:`\beta_e`, :math:`r_e`,
+:math:`A` (spin-orbit constant) and :math:`\Lambda`. Energies are in
+cm\ :sup:`-1` in the file and in J in the code; :math:`g_e =
+(2S+1)(2-\delta_{0,\Lambda})`. Per band: upper and lower state, type and
+an integer multiplier ``smf`` (1 in every shipped file). Per vibrational
+band :math:`(v', v'')`, one row of the transition table: the squared
+electronic transition moment :math:`R_e^2` [(e a\ :sub:`0`)\ :sup:`2`]
+and the Franck-Condon factor :math:`q_{v'v''}`. The format is in
+:doc:`/classes/database`.
+
+Term values and line positions
+------------------------------
+
+Per vibrational band the code evaluates, with all constants in J and
+:math:`x = v + \tfrac12`,
+
+.. math::
+
+   G(v) = \omega_e x - \omega_e x_e x^2 + \omega_e y_e x^3 + \omega_e z_e x^4,
+
+.. math::
+
+   B_v = B_e - \alpha_e x, \qquad D_v = D_e + \beta_e x,
+
+and the band origin
+
+.. math::
+
+   \tilde\nu_0 = \frac{(T_e' - T_e'') + (G' - G'')}{100\,h c}
+   \quad [\mathrm{cm^{-1}}].
+
+:math:`G(v)` includes the zero-point energy and :math:`T_e` is measured
+from the minimum of the ground state. A rotational line between the term
+values :math:`F'(J')` and :math:`F''(J'')` of the two states (given per
+type below) sits at
+
+.. math::
+
+   \tilde\nu = \tilde\nu_0 + \frac{F' - F''}{100\,h c},
+   \qquad
+   \lambda = \frac{1}{100\,\tilde\nu}\ [\mathrm{m}].
+
+The rotational quantum number runs to
+
+.. math::
+
+   k_{\max} = \mathrm{INT}\!\left(\sqrt{\max\!\left(0,
+       \tfrac14 + \frac{D_0'' - G''}{B_v''}\right) + 1}\right),
+
+built from the **lower** state, with the :math:`+1` inside the root (the
+NEQAIR85 form kept from the verified version). A band is skipped in a
+window if :math:`2\lambda_0 < \lambda_{\min}` or
+:math:`\lambda_0/2 > \lambda_{\max}`, :math:`\lambda_0 = 1/(100\tilde\nu_0)`.
+
+These positions come from the four-term expansion of the molecule file,
+not from the rovibronic energies :math:`E(n,v,J)` of the species database
+of dsmcFoam. The expansion cannot hold the higher coefficients of the
+source fits: the database README lists band-origin differences against
+the IPAC tables of a few cm\ :sup:`-1` for low :math:`v` and up to about
+:math:`10^3` cm\ :sup:`-1` for high :math:`v` of O\ :sub:`2`
+Schumann-Runge (``src/radiation/database/README.md``, "Checks").
+
+Line strength
+-------------
+
+Emission
+~~~~~~~~
+
+The line-integrated emission of a line of a band :math:`(v', v'')`, upper
+level :math:`u = (n', v', J')`, is in cgs form
+
+.. math::
+
+   \epsilon_{ul} = \frac{16\pi^3 c\,\tilde\nu^4}{3}\;
+     \frac{N_u}{g_u}\;
+     \mathrm{AF}\;S_{J'J''}\;q_{v'v''}\,R_e^2\,\mathrm{smf}\,(e a_0)^2,
+
+with :math:`N_u/g_u` the upper population per state, :math:`S_{J'J''}`
+the Hoenl-London factor, AF the nuclear-spin alternation factor and
+:math:`e a_0 = 2.5415785\times10^{-18}` esu cm. It follows from the
+emission :math:`N_u A\,hc\tilde\nu/(4\pi)` with the dipole transition
+probability of one line,
+:math:`A = 64\pi^4\tilde\nu^3 S_{J'J''} q R_e^2 (ea_0)^2/(3h\,g_u)`. The
+code writes it as
+
+.. math::
+
+   \epsilon_{ul} = 10^{16}\,\mathrm{AF}\,S_{J'J''}\,
+     (\tilde\nu^2 e a_0)^2\,c_S\,\frac{n_u}{g_u},
+   \qquad
+   c_S = \frac{16\times10^{-5}\,c\,10^{-6}\,q_{v'v''}\,R_e^2\,
+               \mathrm{smf}\,\pi^3}{3},
+
+with :math:`n_u/g_u` in m\ :sup:`-3`, and places
+:math:`\epsilon_{ul}/10^{10}\,\phi_\lambda` on the grid; the factors
+:math:`16\times10^{-5}` (:math:`c` in cm s\ :sup:`-1` and erg to J),
+:math:`10^{-6}` (m\ :sup:`-3` to cm\ :sup:`-3`), :math:`10^{16}` and
+:math:`10^{10}` combine to W m\ :sup:`-3` sr\ :sup:`-1`
+(m\ :sup:`-1` after the profile). For type 2, :math:`c_S` is halved
+(below).
+
+The convention for :math:`R_e^2` is the degeneracy-summed moment of Laux
+and Kruger (PARADE "sumre2/fcf"): the database derives it from the band
+Einstein coefficient as
+
+.. math::
+
+   R_e^2 = \frac{g_e'\,A_{v'v''}}{2.026\times10^{-6}\,
+                 \tilde\nu_{v'v''}^3\,q_{v'v''}},
+
+(Gilmore et al., 1992, Eq. 9), so that the lines of one upper level,
+summed over branches, give the band emission
+:math:`N_{v'} A_{v'v''}\,hc\tilde\nu/(4\pi)`.
+
+Absorption
+~~~~~~~~~~
+
+The absorption follows from the emission by the Einstein relations
+(generalised Kirchhoff law, :doc:`/theory/foundations`):
+
+.. math::
+
+   k_{ul} = \frac{\lambda^5}{2 h c^2}\;\frac{\epsilon_{ul}}{n_u/g_u}\;
+            \left(\frac{n_l}{g_l} - \frac{n_u}{g_u}\right),
+
+coded as :math:`\tilde\nu^{-5}\,10^{16}\,\mathrm{AF}\,S\,(\tilde\nu^2 e
+a_0)^2 c_S\,(n_l/g_l - n_u/g_u)/(2\times10^{10} h c^2)` and divided by
+:math:`10^{10}` on the grid. :math:`k_{ul}` is net of stimulated emission:
+an inverted line has :math:`k_{ul} < 0` (gain), which is kept. The lower
+population per state :math:`n_l/g_l` is given by the population model
+(``lineLowerPopulation``; :doc:`/theory/populations`).
+
+Which lines are placed
+~~~~~~~~~~~~~~~~~~~~~~
+
+At construction a line is kept only if its strength and :math:`\tilde\nu`
+are positive. Per cell, with ``boltzmannTemperatures`` a line is placed
+only if :math:`\epsilon_{ul} \ge 10^{-25}` in the code's units before the
+division by :math:`10^{10}` (i.e. :math:`10^{-35}` W m\ :sup:`-3`
+sr\ :sup:`-1`), its absorption included. With ``cellDistribution`` a line
+below that emission threshold (an empty or unsampled upper level) is
+still placed for its absorption alone when :math:`|k_{ul}|` passes the
+same threshold. The species is skipped in a cell with
+:math:`n_s < 10` m\ :sup:`-3` or :math:`T_{\mathrm{trans}} < 10` K.
+
+Rotational structure
+--------------------
+
+Branches
+~~~~~~~~
+
+A branch is the set of lines with the same :math:`\Delta J = J' - J''`:
+P (:math:`J'' = J' + 1`), Q (:math:`J'' = J'`), R (:math:`J'' = J' - 1`).
+In multiplet bands each spin component :math:`F_i` gives its own main
+branches (:math:`P_1, R_2, \dots`) and the satellite branches between
+different components (:math:`^{O}P_{12}, {}^{S}R_{21}, \dots`).
+
+Hoenl-London factors and their normalisation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Hoenl-London factor :math:`S_{J'J''}` is the rotational part of the
+line strength. In the code it is normalised so that the lines leaving one
+upper level, all its components together, sum to
+
+.. math::
+
+   \sum_{J''} S_{J'J''} = (2J'+1)\,\frac{\text{states of the level}}{g_e\,(2J'+1)},
+
+which is :math:`2J'+1` for a level whose components all exist at
+:math:`J'`. With this normalisation, the sum of the line emissions of a
+level is the band emission :math:`N_{v'}A_{v'v''}hc\tilde\nu/4\pi`.
+
+Types 1 and 2: singlet forms (Herzberg 1950)
+""""""""""""""""""""""""""""""""""""""""""""
+
+**Type 1, parallel** (:math:`\Delta\Lambda = 0`), emission from
+:math:`J' \ge \Lambda`, :math:`L = \Lambda`:
+
+.. math::
+
+   S_R = \frac{(J'+L)(J'-L)}{J'}, \qquad
+   S_Q = \frac{(2J'+1)L^2}{J'(J'+1)}, \qquad
+   S_P = \frac{(J'+1+L)(J'+1-L)}{J'+1},
+
+with no Q branch for :math:`\Lambda = 0` (then :math:`S_R = J'`,
+:math:`S_P = J'+1`). They sum to :math:`2J'+1`.
+
+**Type 2, perpendicular** (:math:`\Delta\Lambda = \pm1`), emission from
+:math:`J' \ge \Lambda'`, :math:`L = \Lambda'` if :math:`\Lambda' <
+\Lambda''`, else :math:`L = -\Lambda'`:
+
+.. math::
+
+   S_P = \frac{(J'+1+L)(J'+2+L)}{J'+1}, \qquad
+   S_Q = \frac{(J'-L)(2J'+1)(J'+1+L)}{J'(J'+1)}, \qquad
+   S_R = \frac{(J'-L)(J'-1-L)}{J'}.
+
+These forms sum to :math:`2(2J'+1)` per upper level: they count both
+:math:`\Lambda`-doubling components of the :math:`\Pi` (or
+:math:`\Delta`) state. The code therefore halves :math:`c_S` for every
+type-2 band, the factor :math:`(2-\delta_{0,\Lambda'+\Lambda''}) = 2`
+(figure, panel a).
+
+Types 3, 5, 6: matrix method in the Hund's case (a) basis
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+For multiplet states (doublets and triplets with :math:`\Lambda > 0`) the
+coupling between electron spin and rotation changes with :math:`J`: from
+Hund's case (a) (spin coupled to the internuclear axis, large
+:math:`Y = A/B_v`) at low :math:`J` towards case (b) (spin coupled to the
+rotation) at high :math:`J`. The code covers all intermediate couplings
+with the matrix method (Arnold, Whiting and Lyle 1969; Whiting and
+Nicholls 1974; Kovács 1969, ch. 3). For a state at :math:`J` it builds the
+rotational Hamiltonian of Hill and Van Vleck (1928) in the case (a) basis
+:math:`|\Lambda, \Sigma, \Omega = \Lambda + \Sigma\rangle`,
+:math:`\Sigma = -S, \dots, S`, restricted to :math:`|\Omega| \le J`,
+
+.. math::
+
+   \langle\Omega|H|\Omega\rangle
+     = B_v\left[J(J+1) - \Omega^2 + S(S+1) - \Sigma^2\right]
+       + A\Lambda\Sigma,
+
+.. math::
+
+   \langle\Omega|H|\Omega+1\rangle
+     = -B_v\sqrt{J(J+1) - \Omega(\Omega+1)}\,
+            \sqrt{S(S+1) - \Sigma(\Sigma+1)},
+
+and diagonalises it (Jacobi rotations, basis size :math:`\le 3`,
+:math:`S \le 1`). The eigenvalues are the term values of the spin
+components; the eigenvectors :math:`c(\Omega)` give the mixing. The
+strength of the line between eigenstate :math:`u` at :math:`J'` and
+eigenstate :math:`l` at :math:`J''` is
+
+.. math::
+
+   S_{J'J''} = \frac{2J'+1}{(2S+1)(2-\delta_{0,\Lambda'+\Lambda''})}
+     \sum_{\sigma}\left|\sum_{\Sigma}
+       c_u(\Omega')\,c_l(\Omega'')\,
+       \langle J', -\Omega';\, 1, q \,|\, J'', -\Omega''\rangle
+     \right|^2,
+
+with :math:`q = \Omega' - \Omega''` (:math:`\Sigma` conserved by the
+dipole operator), :math:`\langle\cdot|\cdot\rangle` a Clebsch-Gordan
+coefficient (Condon-Shortley table) and :math:`\sigma` the two signs of a
+:math:`\Lambda > 0` state (the :math:`\Lambda`-doubling components, merged
+in the levels; for :math:`\Pi`-:math:`\Pi` only the same sign
+contributes). Every line between the components that exist at
+:math:`J'` and :math:`J'' = J', J' \pm 1` is computed, satellites
+included, and dropped only if :math:`S < 10^{-12}(2J'+1)`. The limits of
+this formula are Herzberg's singlet forms, the pure case (a) and case (b)
+forms, and Earls (1935) for :math:`^2\Sigma`-:math:`^2\Pi`.
+
+The **line positions** of these types use closed-form term values; each
+eigenstate is matched to the closed-form root nearest in energy. With
+:math:`Y = A/B_v`:
+
+* type 3, :math:`^2\Sigma`-:math:`^2\Pi` (no centrifugal term):
+
+  .. math::
+
+     F_{1,2} = B_v\left[(J+\tfrac12)^2 - \Lambda^2
+       \mp \tfrac12\sqrt{4(J+\tfrac12)^2 + Y(Y-4)\Lambda^2}\right];
+
+* type 5, :math:`^2\Pi`-:math:`^2\Pi`: the same with
+  :math:`-D_v J^4` (:math:`F_1`) and :math:`-D_v (J+1)^4` (:math:`F_2`);
+* type 6, :math:`^3\Pi`-:math:`^3\Pi` (Budó):
+
+  .. math::
+
+     F_1 = B_v\left[J(J+1) - \sqrt{Z_1} - 2Z_2\right] - D_v (J-\tfrac12)^4,
+
+  .. math::
+
+     F_2 = B_v\left[J(J+1) + 4Z_2\right] - D_v (J+\tfrac12)^4,
+
+  .. math::
+
+     F_3 = B_v\left[J(J+1) + \sqrt{Z_1} - 2Z_2\right] - D_v (J+\tfrac32)^4,
+
+  .. math::
+
+     Z_1 = \Lambda^2 Y(Y-4) + \tfrac43 + 4J(J+1),
+     \qquad
+     Z_2 = \frac{\Lambda^2 Y(Y-1) - \tfrac49 - 2J(J+1)}{3 Z_1}.
+
+The eigenvalues of the matrix equal the type-3 and type-5 closed forms
+exactly (without :math:`D_v`), and Budó's type-6 forms within
+0.6 cm\ :sup:`-1` (code comment, ``diatomicBandsLines.C``). Panel (b) of
+the figure shows the two components of NO X :sup:`2`\ :math:`\Pi`
+(:math:`Y = 72.7`, close to case (a)): at :math:`J = 1/2` only the
+:math:`\Omega = 1/2` component exists.
+
+Type 4: :math:`^2\Sigma`-:math:`^2\Sigma`
+"""""""""""""""""""""""""""""""""""""""""
+
+Both states are case (b). The levels are keyed by the integer
+:math:`J = N`, and six branches are computed: :math:`R_1, R_2, P_1, P_2`
+and the satellites :math:`F_2' \to F_1''` and :math:`F_1' \to F_2''`. The
+strengths are those of the matrix method above, evaluated at the true
+:math:`J` of each component (:math:`F_1`: :math:`J = N + \tfrac12`,
+:math:`F_2`: :math:`J = N - \tfrac12`). The positions use the type-5 term
+form with the integer :math:`J`:
+
+.. math::
+
+   F_\mp = B_v\left[(J+\tfrac12)^2 - \Lambda^2
+       \mp \tfrac12\sqrt{4(J+\tfrac12)^2 + Y(Y-4)\Lambda^2}\right]
+       - D_v (J + o)^4,
+   \qquad o \in \{0, 1\}.
+
+Type 1 term values and triplet splitting
+""""""""""""""""""""""""""""""""""""""""
+
+For type 1 the positions are
+
+.. math::
+
+   F = B_v\left[J(J+1) + 4 Z_2\right] - D_v (J+\tfrac12)^4,
+
+with :math:`Z_2` (as for type 6) only when the **upper** state is a
+triplet (:math:`g_e = 3` for :math:`\Lambda = 0`, :math:`g_e/2 = 3`
+otherwise), applied to both states; :math:`Z_2 = 0` otherwise. This is the
+O\ :sub:`2` Schumann-Runge case (B :sup:`3`\ :math:`\Sigma_u^-`).
+
+Type 2 term values
+""""""""""""""""""
+
+For type 2, :math:`F = B_v J(J+1) - D_v (J+\tfrac12)^4`, with no spin
+splitting, even for triplets: the N\ :sub:`2` first positive system
+(B :sup:`3`\ :math:`\Pi_g \to` A :sup:`3`\ :math:`\Sigma_u^+`) is computed
+as a singlet-like perpendicular band, and the NO :math:`\beta'` system
+(B' :sup:`2`\ :math:`\Delta \to` X :sup:`2`\ :math:`\Pi`) with
+:math:`\Lambda' = 2` at the spin-averaged positions.
+
+.. figure:: /_static/figures/diatomic_bands/hoenl_london_terms.png
+   :width: 100%
+
+   (a) Type-2 Hoenl-London factors of a :sup:`1`\ :math:`\Pi \to`
+   :sup:`1`\ :math:`\Sigma` band and their sum :math:`2(2J'+1)` per upper
+   level, the reason for the halved :math:`c_S`. (b) Term values of the two
+   spin components of NO X :sup:`2`\ :math:`\Pi`, :math:`v = 0` (constants
+   of ``NO.dat``): closed form (black lines) and eigenvalues of the case (a)
+   Hamiltonian of the matrix method (red markers). Script:
+   ``_static/figures/diatomic_bands/plot_hoenl_london_terms.py``.
+
+Parity, nuclear spin and the alternation factor
+-----------------------------------------------
+
+In a homonuclear molecule (N\ :sub:`2`, N\ :sub:`2`\ :sup:`+`,
+O\ :sub:`2`) the exchange symmetry of the nuclei gives the rotational
+levels of a :math:`\Sigma` state alternating statistical weights. The
+code applies a per-line alternation factor
+
+.. math::
+
+   \mathrm{AF} = 1 + \frac{(-1)^{\mathrm{NINT}(J'' + a')}}{2I'' + 1},
+
+with :math:`a'` the entry ``altnat`` of the **upper** state and
+:math:`I''` the entry ``nuspin`` (nuclear spin) of the **lower** state;
+AF = 1 if ``altnat`` = 0. For :sup:`14`\ N (:math:`I = 1`) AF is
+:math:`4/3` or :math:`2/3`, mean 1; for :sup:`16`\ O (:math:`I = 0`) it is
+2 or 0, i.e. every second rotational level of the lower state is missing.
+Because the mean of AF is one, the partition function has no symmetry
+number (:doc:`/theory/populations`).
+
+The database chooses ``altnat`` so that the lines favour the lower-state
+rotational levels that are symmetric under exchange of the (boson)
+nuclei: 2 (even :math:`N''`) for :math:`\Sigma_g^+` and
+:math:`\Sigma_u^-` lower states, 1 (odd :math:`N''`) for
+:math:`\Sigma_u^+` and :math:`\Sigma_g^-`, 0 for a :math:`\Pi` lower
+state (both parities at each :math:`J`), for heteronuclear NO and for
+states that are never an upper state. The alternation of a type-3 band is
+not defined: a type-3 band with ``altnat'`` :math:`\neq 0` is a fatal
+error, and the N\ :sub:`2`\ :sup:`+` Meinel upper state has ``altnat`` 0
+(no line-by-line alternation, band-summed strength unchanged).
+
+:math:`\Lambda`-doubling (the two parity components :math:`e/f` of a
+:math:`\Lambda > 0` state) is not resolved: the two components are one
+level with weight :math:`(2-\delta_{0,\Lambda})`, and their lines are
+summed in the strengths.
+
+Levels and statistical weights
+------------------------------
+
+Each line creates (or reuses) its upper and lower level, keyed by
+(state, :math:`v`, :math:`J`), the key the population models match:
+
+* types 1, 2, 4 (:math:`J` the rotational quantum number of a
+  singlet-like or case (b) treatment): :math:`g = g_e(2J+1)`;
+* types 3, 5, 6 (spin components resolved with their own :math:`J`):
+  :math:`g = (2-\delta_{0,\Lambda})\,n(J)\,(2J+1)`, with :math:`n(J)` the
+  number of spin components with :math:`|\Omega| \le J`, e.g. 4 instead
+  of 8 at :math:`J = 1/2` of a :math:`^2\Pi` state.
+
+The first band that creates a level sets its weight. A half-integer
+:math:`J` is keyed by :math:`J - \tfrac12` (the rotational index of the
+DSMC ladder), except when (state, :math:`v`, :math:`J-\tfrac12`) is also
+the key of an integer-:math:`J` level of different energy, as for
+N\ :sub:`2`\ :sup:`+` X :sup:`2`\ :math:`\Sigma_g^+`, lower state of both
+the first negative band (type 4, integer :math:`J = N`) and the Meinel
+band (type 3, half-integer :math:`J`): the half-integer level is then
+keyed "state v 2J/2" (e.g. ``X2Sigma 0 5/2``). The energy parts of each
+level are :math:`E_{\mathrm{el}} = T_e`, :math:`E_{\mathrm{vib}} = G(v)`,
+:math:`E_{\mathrm{rot}} = B_v J(J+1)`, the energies of the populations
+from temperatures. A level that two bands reach with different energies
+is a fatal error.
+
+Line widths
+-----------
+
+The molecular widths (FWHM, m) are evaluated once per vibrational band at
+its origin :math:`\lambda_0 = 0.01/\tilde\nu_0`, with :math:`M = m/m_u`,
+:math:`n` the radiator density and :math:`T` its translational
+temperature:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 82
+
+   * - Width
+     - Expression
+   * - Doppler
+     - :math:`7.16\times10^{-7}\,\lambda_0\sqrt{T/M}`
+   * - self
+     - :math:`1.33\times10^{-29}\sqrt{2/M}\,\lambda_0^2\sqrt{T}\,n\,
+       \times10^{-6}\times10\times10^{10}`
+   * - foreign gas
+     - :math:`5.85\times10^{-30}\sqrt{1/M + 1/M_f}\,\lambda_0^2\sqrt{T}\,n_f
+       \times10^{-6}\times10\times10^{10}`
+   * - natural
+     - :math:`1.18\times10^{-14}` (constant)
+   * - Stark
+     - :math:`10^{-8}\times0.3\,(10^{-22}\max(n_e, 10^{-6}))^{0.6}\,
+       \lambda_0^2\times10^{10}`
+
+with :math:`n_f = \max(p/k_BT - n, 10^{-40}p/k_BT)`,
+:math:`p = \sum_j n_j k_B T_j + n_e k_B T_e`, and the Voigt width
+:math:`w_L/2 + \sqrt{w_L^2/4 + w_G^2}`. These are the PARADE cgs/Ångström
+forms of the verified version; the foreign-gas molar mass is compared
+with bounds in mismatched units and ends at 10 (pure radiator) or 28.85
+(any mixture), the Stark width has no :math:`T_e` dependence. The
+profile and its placement are in :doc:`/theory/line_shapes`.
+
+Forms kept from the verified version
+------------------------------------
+
+The class header (``diatomicBands.H``) lists the forms of the verified
+version that are kept on purpose, because correcting them changes the
+spectra and is a separate decision. The main ones:
+
+1. The transition-table reader skips exactly one record after the row
+   count; with more comment records before the data, the first rows are
+   undefined (taken as zero) and the last rows unread. The shipped files
+   have one header record per table, so every row is read.
+2. :math:`k_{\max}` from the lower state, :math:`+1` inside the root.
+3. Populations use :math:`B_v J(J+1)` only; positions and the lower
+   population of ``boltzmannTemperatures`` use the full :math:`F`.
+4. Type 1: triplet terms of both states switched on by the upper state;
+   :math:`Z_2` with :math:`-4/9` (sign not confirmed).
+5. Type 2 has no spin splitting.
+6. Type 4 uses integer :math:`J` (:math:`= N`) in the half-integer term
+   forms.
+7. Types 4-6 refuse :math:`k_{\max} > 500`.
+8. :math:`G(v)` with :math:`+\omega_e z_e`.
+9. Molecular widths as above (PARADE factors, foreign-gas mass, constant
+   natural width, Stark without :math:`T_e`).
+10. ``smf`` rounded to an integer.
+
+References
+----------
+
+* Arnold, Whiting and Lyle (1969). *Journal of Quantitative Spectroscopy
+  and Radiative Transfer* 9, 775 (as cited in ``diatomicBandsLines.C``).
+* Earls (1935). Hoenl-London factors of :sup:`2`\ :math:`\Sigma`-:sup:`2`\ :math:`\Pi`
+  transitions (as cited in ``diatomicBands.H``).
+* Gilmore, F. R., Laher, R. R. and Espy, P. J. (1992). Franck-Condon
+  factors, r-centroids, electronic transition moments, and Einstein
+  coefficients for many nitrogen and oxygen band systems. *Journal of
+  Physical and Chemical Reference Data* 21, 1005-1107.
+  DOI 10.1063/1.555910.
+* Herzberg, G. (1950). *Molecular Spectra and Molecular Structure I.
+  Spectra of Diatomic Molecules*, 2nd ed. Van Nostrand, New York.
+* Hill and Van Vleck (1928). Rotational Hamiltonian of multiplet states
+  (as cited in ``diatomicBandsLines.C``).
+* Kovács, I. (1969). *Rotational Structure in the Spectra of Diatomic
+  Molecules*. Adam Hilger, London.
+* Laux, C. O. (1993). Optical diagnostics and radiative emission of air
+  plasmas. PhD thesis, Stanford University.
+* Whiting and Nicholls (1974). *Astrophysical Journal Supplement Series*
+  27, 1 (as cited in ``diatomicBandsLines.C``).

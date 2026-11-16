@@ -1,0 +1,55 @@
+radiationFoam
+=============
+
+radiationFoam computes the spectral emission, absorption and transport of
+radiation in high-temperature, non-equilibrium gases, and reproduces what a
+shock-tube spectrometer records. It is an OpenFOAM v2512 application built on
+one library, ``libradiationFoam``, and needs no other library.
+
+The populations of the radiating states come from either of two inputs:
+
+* **temperatures**, re-expanded into Boltzmann populations over the
+  rovibronic levels of each species; or
+* **the local state distribution** :math:`n(n,v,J)` of each cell, sampled
+  by the rovibronic DSMC solver dsmcFoam+, with no assumption on the shape
+  of the distribution.
+
+The second input is the purpose of the code: the radiance is computed
+directly from the state-resolved populations of the gas kinetics, with the
+same spectroscopic database on both sides.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User and Developer Guide
+
+   guide/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Theory Guide
+
+   theory/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Library Classes
+
+   classes/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials and Examples
+
+   examples/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   reference/index
+
+Indices
+-------
+
+* :ref:`genindex`
+* :ref:`search`

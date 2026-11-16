@@ -1,0 +1,40 @@
+Bibliography
+============
+
+Every reference cited in this documentation, merged from the pages.
+Entries marked *as cited in* give the reference as the source code cites it,
+because the full reference is not held in the repository.
+
+* Arnold, Whiting and Lyle (1969), Journal of Quantitative Spectroscopy and Radiative Transfer 9, 775 (as cited in diatomicBandsLines.C; authors' initials and title not in the repository)
+* Beyer, J., Pfeiffer, M. and Fasoulas, S., Non-equilibrium radiation modeling in a gas kinetic simulation code, Journal of Quantitative Spectroscopy and Radiative Transfer, 280, 108083, 2022, DOI 10.1016/j.jqsrt.2022.108083
+* Brandis, A. M. and Cruden, B. A., "Benchmark Shock Tube Experiments of Radiative Heating Relevant to Earth Re-entry," 55th AIAA Aerospace Sciences Meeting, Grapevine, TX, AIAA Paper 2017-1145, 2017. DOI 10.2514/6.2017-1145
+* Civrais, C. H. B., Pfeiffer, M., White, C. and Steijl, R., Modelling of the electronic excited states in high-temperature flows, Physics of Fluids, 36(8), 086112, 2024. doi:10.1063/5.0215853
+* Cruden, B. A. and Brandis, A. M., "Measurement of Radiative Nonequilibrium for Air Shocks Between 7 and 9 km/s," Journal of Thermophysics and Heat Transfer, 34 (1), 154-180, 2020. DOI 10.2514/1.T5735
+* Earls (1935), Hoenl-London factors of 2Sigma-2Pi transitions (as cited in diatomicBands.H; full reference not in the repository)
+* Gilmore, F. R., Laher, R. R. and Espy, P. J., Franck-Condon factors, r-centroids, electronic transition moments, and Einstein coefficients for many nitrogen and oxygen band systems, Journal of Physical and Chemical Reference Data, 21(5), 1005-1107, 1992, DOI 10.1063/1.555910
+* Griem, H. R. (1964), p. 97, as written by Laux (1993) Eq. 4.20 (cited in atomicLines.H through Laux; no further details in the repository)
+* Griem, H. R., Spectral Line Broadening by Plasmas, Academic Press, New York and London, 1974
+* Herzberg, G., Molecular Spectra and Molecular Structure I. Spectra of Diatomic Molecules, 2nd ed., Van Nostrand, New York, 1950
+* Hill and Van Vleck (1928), rotational Hamiltonian of multiplet states (as cited in diatomicBandsLines.C; full reference not in the repository)
+* Huber, K. P. and Herzberg, G., Molecular Spectra and Molecular Structure IV. Constants of Diatomic Molecules, Van Nostrand Reinhold, New York, 1979, DOI 10.1007/978-1-4757-0961-2
+* IAEA Nuclear Data Section, Live Chart of Nuclides, ground-state data API, https://www-nds.iaea.org/relnsd/v1/data (retrieved 2026-11-14)
+* Johnston, C. O., Nonequilibrium Shock-Layer Radiative Heating for Earth and Titan Entry, PhD dissertation, Virginia Polytechnic Institute and State University, Blacksburg, VA, 2006
+* Kovacs, I., Rotational Structure in the Spectra of Diatomic Molecules, Adam Hilger, London, 1969
+* Kramers, H. A., On the theory of X-ray absorption and of the continuous X-ray spectrum, The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science, 46(275), 836-871, 1923, doi:10.1080/14786442308565244
+* Kramida, A., Ralchenko, Yu., Reader, J. and NIST ASD Team, NIST Atomic Spectra Database (version 5.12), National Institute of Standards and Technology, Gaithersburg, MD, 2024. DOI 10.18434/T4W30F (key of src/radiation/database/SOURCES.md)
+* Laher, R. R. and Espy, P. J., Spectroscopy Research: Electronic Transition Data, Infrared Processing and Analysis Center, California Institute of Technology, https://web.ipac.caltech.edu/staff/laher/fluordir/fluorindex.html, last revised 25 May 1999
+* Laher, R. R. and Gilmore, F. R., Improved fits for the vibrational and rotational constants of many states of nitrogen and oxygen, Journal of Physical and Chemical Reference Data, 20(4), 685-712, 1991, DOI 10.1063/1.555892
+* Laux, C. O., Optical diagnostics and radiative emission of air plasmas, PhD thesis, Stanford University (HTGL Report T-288), 1993
+* Liu, Y., Lin, J., Huang, G., Guo, Y. and Duan, C., Simple empirical analytical approximation to the Voigt profile, Journal of the Optical Society of America B, 18(5), 666, 2001. doi:10.1364/JOSAB.18.000666
+* Lofthus, A. and Krupenie, P. H., The spectrum of molecular nitrogen, Journal of Physical and Chemical Reference Data, 6, 113-307, 1977, DOI 10.1063/1.555546
+* Olivero, J. J. and Longbothum, R. L., "Empirical fits to the Voigt line width: A brief review," Journal of Quantitative Spectroscopy and Radiative Transfer, 17 (2), 233-236, 1977. DOI 10.1016/0022-4073(77)90161-3
+* PARADE molecule radiation data file N2ihl.dat, revision 2.2.4.2, H. Liebhart, 2010 (database/SOURCES.md key PARADE-N2ihl)
+* Park, C. (1982), quoted by Johnston (2006) for the Stark temperature exponent 1/3; full reference not held in the repository
+* Rybicki, G. B., Lightman, A. P., Radiative Processes in Astrophysics, 1979
+* Spelsberg, D. and Meyer, W., Dipole-allowed excited states of N2: potential energy curves, vibrational analysis, and absorption intensities, Journal of Chemical Physics, 115(14), 6438-6449, 2001, DOI 10.1063/1.1400139
+* Thompson, P., Cox, D. E. and Hastings, J. B., Journal of Applied Crystallography, 20, 79, 1987 (pseudo-Voigt; as cited in src/radiation/instrument/instrumentFunctions/derived/instrumentVoigt/instrumentVoigt.H; title not in the repository; not in reference.bib)
+* White, C., Borg, M. K., Scanlon, T. J., Longshaw, S. M., John, B., Emerson, D. R. and Reese, J. M., dsmcFoam+: An OpenFOAM based direct simulation Monte Carlo solver, Computer Physics Communications, 224, 22-43, 2018. doi:10.1016/j.cpc.2017.09.030
+* Whiting and Nicholls (1974), Astrophysical Journal Supplement Series 27, 1 (as cited in diatomicBandsLines.C; initials and title not in the repository)
+* Whiting, E. E., An empirical approximation to the Voigt profile, Journal of Quantitative Spectroscopy and Radiative Transfer, 8(6), 1379-1384, 1968, doi:10.1016/0022-4073(68)90081-2
+* Wilson, K. H., Nicolet, W. E., Spectral absorption coefficients of carbon, nitrogen, and oxygen atoms, Journal of Quantitative Spectroscopy and Radiative Transfer, 7, 891-941, 1967
+* Zel'dovich, Ya. B., Raizer, Yu. P. (1966), cited through Johnston (2006) for the Kramers cross section and emission; full reference not held in the repository

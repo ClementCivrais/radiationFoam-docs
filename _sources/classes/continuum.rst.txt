@@ -1,0 +1,250 @@
+Continuum classes
+=================
+
+Source: ``src/radiation/continuum/``.
+
+::
+
+    continuum/
+        basic/continuumModel/          abstract base: one process of one species
+        continuumProcesses/            builds and holds the processes of a case
+        derived/boundFreePhysical/     photoionisation + radiative recombination
+        derived/freeFreePhysical/      bremsstrahlung + inverse bremsstrahlung
+
+The physics is in :doc:`/theory/continuum`. The classes work on plain
+data only (no mesh, no cloud). Units, as for the radiators: emission
+:math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`],
+absorption :math:`\kappa_\lambda` [m\ :sup:`-1`].
+
+continuumProcesses
+------------------
+
+``continuumProcesses/continuumProcesses.H``. Built once by the
+application from ``radiationProperties`` and the list of radiating
+species; passed to the transport model.
+
+Dictionary entries (``system/radiationProperties``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``continuum`` (top level)
+     - word
+     - ``none``
+     - ``none`` or ``physical``, for every species without its own entry
+   * - ``continuum`` (species sub-dictionary)
+     - word
+     - top-level value
+     - per-species override
+   * - ``continuumCoeffs`` (species)
+     - dictionary
+     - empty
+     - coefficients of the processes of the species (below)
+
+Construction rules:
+
+* ``none``: the species has no process.
+* ``physical`` on an atomic species (``model atomicLines``): a
+  ``boundFreePhysical`` process if ``continuumCoeffs`` has an
+  ``ionSpecies`` (otherwise the log says "no ionSpecies, no bound-free");
+  a ``freeFreePhysical`` process if ``chargeNumber`` is 1 or more.
+* ``physical`` given in the species entry of a non-atomic species: fatal
+  error. The global entry skips non-atomic species.
+* Any other value is a fatal error; the removed value ``piclas`` says so
+  explicitly.
+
+Main member functions: ``active()`` (at least one process),
+``size()``, ``model(i)``, ``processName(i)`` (``<model type>_<species>``,
+the column names of ``continuum.csv``), and
+``addEmissionAbsorption(grid, populations, state, emission, absorption)``,
+which adds the coefficients of all processes to the given fields.
+
+continuumModel
+--------------
+
+Abstract base class (``basic/continuumModel/continuumModel.H``) of one
+continuum process of one atomic species. It stores the species list,
+the species index, the ``continuumCoeffs`` sub-dictionary, the charge
+number and the index of the ion species.
+
+.. list-table:: Entries of ``continuumCoeffs`` read by the base class
+   :header-rows: 1
+   :widths: 18 10 14 58
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``chargeNumber``
+     - label
+     - required
+     - charge of the species: 0 for N, O; 1 for N\ :sup:`+`, O\ :sup:`+`
+   * - ``ionSpecies``
+     - word
+     - none
+     - the radiating species one charge higher (bound-free partner).
+       Must be a radiating species of the case and not the species
+       itself, else a fatal error
+
+Run-time selection: ``continuumModel::New(modelType, species,
+speciesi, dict)``, called by ``continuumProcesses`` with the model types
+above (the user does not name them). Pure virtual member:
+
+.. code-block:: cpp
+
+   virtual void addEmissionAbsorption
+   (
+       const spectralGrid& grid,
+       const radiationPopulationModel& populations,
+       const radiationCellState& state,
+       scalarField& emission,     // j_lambda is added here
+       scalarField& absorption    // kappa_lambda is added here
+   ) const = 0;
+
+boundFreePhysical
+-----------------
+
+``derived/boundFreePhysical``. Selection name ``boundFreePhysical``.
+Photoionisation of each bound level of the species and radiative
+recombination onto it, related by the Milne relation, so that
+:math:`j/\kappa = B_\nu(T_e)` for Saha-Boltzmann populations.
+
+.. list-table:: Entries of ``continuumCoeffs``
+   :header-rows: 1
+   :widths: 22 10 14 54
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``chargeNumber``
+     - label
+     - required
+     - charge of the species; :math:`Z = \texttt{chargeNumber} + 1` in
+       the hydrogenic cross section
+   * - ``ionSpecies``
+     - word
+     - required here
+     - the recombining ion; its level 0 gives :math:`n_{+0}`,
+       :math:`g_{+0}`
+   * - ``crossSection``
+     - word
+     - required
+     - ``hydrogenic`` (Kramers for every level) or ``tabulated``
+   * - ``photoionisationFile``
+     - file name
+     - required if ``tabulated``
+     - per-level cross sections (format below); ``$VAR`` expanded
+   * - ``gauntFactor``
+     - scalar
+     - 1
+     - Gaunt factor :math:`G` of the hydrogenic form
+
+Example (N with tabulated cross sections, ion N\ :sup:`+`):
+
+.. code-block:: cpp
+
+   N
+   {
+       model           atomicLines;
+       mass            2.326e-26;
+       radius          0.7e-10;
+       atomicLinesCoeffs { ... }
+       continuum       physical;
+       continuumCoeffs
+       {
+           chargeNumber        0;
+           ionSpecies          N+;
+           crossSection        tabulated;
+           photoionisationFile "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I_photoionisation.dat";
+       }
+   }
+
+**Photoionisation file.** Free format, ``//`` comments allowed:
+
+.. code-block:: text
+
+   nLevels
+   index hydrogenic
+   index steps  nSteps  hnuA_1 hnuB_1 sigma_1 ...    [eV eV Mb]
+   index power  hnu_th  sigma_th theta              [eV Mb -]
+
+one row per level of the species' transition file (``index``: its level
+index; 1 Mb = 10\ :sup:`-22` m\ :sup:`2`). ``nLevels`` must equal the
+number of levels of the species, and every index must be a level of the
+transition file, else a fatal error. A step applies on
+:math:`[h\nu_A, h\nu_B)`; below the first step the first value, above
+the last step zero. The shipped files are
+``database/atoms/N_I_photoionisation.dat`` and ``O_I_photoionisation.dat``
+(Johnston 2006, Appendix B), generated by
+``database/sources/build_photoionisation.py``
+(:doc:`/classes/database`).
+
+Member functions: ``crossSection(i, hnu)`` returns
+:math:`\sigma_i` [m\ :sup:`2`] at photon energy ``hnu`` [J] (above
+threshold; the threshold :math:`E_b - E_i` is applied in
+``addEmissionAbsorption``), and ``addEmissionAbsorption``, which loops
+over the grid wavelengths and over the bound levels
+(:math:`E_i < E_b`). Nothing is added when :math:`T_e \le 0` or when the
+population model gives no populations for the species.
+
+freeFreePhysical
+----------------
+
+``derived/freeFreePhysical``. Selection name ``freeFreePhysical``.
+Kramers bremsstrahlung of Maxwellian electrons at :math:`T_e` in the
+field of the ion (the species itself, density from the cell state), and
+the absorption by Kirchhoff's law.
+
+.. list-table:: Entries of ``continuumCoeffs``
+   :header-rows: 1
+   :widths: 22 10 14 54
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``chargeNumber``
+     - label
+     - required
+     - :math:`Z \ge 1`; a value below 1 is a fatal error
+   * - ``gauntFreeFree``
+     - scalar
+     - 1
+     - free-free Gaunt factor :math:`G_{ff}`
+
+Example (N\ :sup:`+`):
+
+.. code-block:: cpp
+
+   N+
+   {
+       model           atomicLines;
+       ...
+       continuumCoeffs { chargeNumber 1; }
+   }
+
+Electron-neutral bremsstrahlung is not included. Nothing is added when
+:math:`T_e \le 0`.
+
+Outputs
+-------
+
+The classes write nothing themselves. In ``singleCell`` mode the
+transport model writes ``continuum.csv`` (wavelength [nm], then
+``<process>_emission`` and ``<process>_absorption`` per process) and
+logs :math:`4\pi\int j\,\mathrm{d}\lambda` and
+:math:`\int\kappa\,\mathrm{d}\lambda` of each process
+(:doc:`/classes/transport`).
+
+References
+----------
+
+* Johnston, C. O. (2006). *Nonequilibrium Shock-Layer Radiative Heating
+  for Earth and Titan Entry*. PhD dissertation, Virginia Polytechnic
+  Institute and State University, Blacksburg, VA.

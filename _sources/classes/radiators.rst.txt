@@ -1,0 +1,243 @@
+Radiating species
+=================
+
+Source: ``src/radiation/radiators/``.
+
+A radiating species computes the spectral emission
+:math:`j_\lambda` [W m\ :sup:`-3` sr\ :sup:`-1` m\ :sup:`-1`] and absorption
+:math:`\kappa_\lambda` [m\ :sup:`-1`] of one species in one cell. The base
+class is run-time selected; two derived classes exist::
+
+    radiators/
+        basic/radiatingSpecies/     abstract base, selector (entry model)
+        derived/atomicLines/        atoms and atomic ions, line by line
+        derived/diatomicBands/      diatomic molecules and ions, band systems
+                                    line by line (three source files)
+
+Theory: :doc:`/theory/atomic_lines`, :doc:`/theory/diatomic_bands`.
+
+radiatingSpecies (base class)
+-----------------------------
+
+``src/radiation/radiators/basic/radiatingSpecies/radiatingSpecies{,New}.{H,C}``
+
+One sub-dictionary per species in the ``species`` dictionary of
+``system/radiationProperties``, keyed by the species name. The selector
+reads ``model``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword
+     - Type
+     - Default
+     - Meaning
+   * - ``model``
+     - word
+     - required
+     - ``atomicLines`` or ``diatomicBands``
+   * - ``mass``
+     - scalar
+     - required
+     - particle mass [kg]
+   * - ``radius``
+     - scalar
+     - required
+     - hard-sphere radius [m] (phase broadening of atomic lines; unused by
+       ``diatomicBands``)
+   * - ``<model>Coeffs``
+     - dictionary
+     - required
+     - coefficients of the derived class
+
+The entries ``windowEdge`` and ``subBinLines`` were removed: a case that
+gives either (in the species dictionary or an enclosing one) stops with a
+FatalIOError. The line placement has one form: every grid point receives
+the line profile integral over its own bin, at the window edges and for
+lines narrower than a bin (:doc:`/theory/line_shapes`).
+
+Interface:
+
+* ``name()``, ``mass()``, ``radius()``;
+* ``levels()``: the ``radiationLevels`` whose populations the species needs
+  (:doc:`common`);
+* ``addEmissionAbsorption(grid, populations, state, speciesi, emission,
+  absorption)``: add the species' :math:`j_\lambda` and
+  :math:`\kappa_\lambda` on the grid, with the populations of the
+  ``radiationPopulationModel`` (:doc:`populations`); ``speciesi`` is the
+  index of the species in the cell state.
+
+The species does not compute populations; it passes its levels to the
+population model and receives :math:`n_i`, the bound limit and the
+electron temperature for the Stark width.
+
+atomicLines
+-----------
+
+``src/radiation/radiators/derived/atomicLines/atomicLines.{H,C}``
+
+Bound-bound emission and absorption of an atom or atomic ion from a list
+of levels and lines in the atomic format of the database
+(:doc:`database`). At construction it reads the transition file and
+prints the number of levels and lines.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword (``atomicLinesCoeffs``)
+     - Type
+     - Default
+     - Meaning
+   * - ``transitionFile``
+     - fileName
+     - required
+     - atomic file (environment variables expanded)
+   * - ``ionisationEnergy``
+     - scalar
+     - required
+     - ionisation energy [cm\ :sup:`-1`]; with the lowering it gives the
+       bound limit. Must be the real limit: with 0 no line is computed
+   * - ``starkExponent``
+     - scalar
+     - required
+     - temperature exponent :math:`n_S` of the Stark width [-]
+   * - ``lineShape``
+     - word
+     - required
+     - line profile model (``voigtWhitingOliveroLongbothum``,
+       :doc:`line_shapes`)
+
+The entry ``starkDensity`` was removed (electron-impact Stark broadening
+with :math:`n_e` and :math:`T_e` of the cell is the only form); a case that
+gives it stops with a FatalIOError.
+
+.. code-block:: cpp
+
+   N
+   {
+       model           atomicLines;
+       mass            2.326e-26;      // [kg]
+       radius          0.7e-10;        // [m]
+
+       atomicLinesCoeffs
+       {
+           transitionFile      "$RADIATIONFOAM_DIR/src/radiation/database/atoms/N_I.dat";
+           ionisationEnergy    117225.7;       // [cm^-1], NIST ASD v5.12
+           starkExponent       0.33;           // Johnston (2006) Eq. 3.13
+           lineShape           voigtWhitingOliveroLongbothum;
+       }
+   }
+
+Per cell (``addEmissionAbsorption``):
+
+1. skip the species if :math:`n < 10` m\ :sup:`-3` or
+   :math:`T_{\mathrm{trans}} < 10` K, or if the population model returns no
+   population;
+2. compute the decay rate :math:`\Gamma` of each level, the mixture density
+   and the collision rate for the phase width (radiating species only);
+3. per line: skip if the upper level is above the bound limit; compute the
+   integrated emission and absorption and the five Lorentzian widths and
+   the Doppler width; skip if farther than
+   :math:`100\max(w_L, w_D) + \Delta\lambda` from the grid; get the
+   bin-integrated profile from the line-shape model and add
+   :math:`\max(0,\epsilon)\phi_i` to the emission and :math:`k\,\phi_i`
+   (signed, gain kept) to the absorption;
+4. with a population model that models levels (``cellDistribution``
+   ``boltzmannFill``), report the emission of the lines with a modelled
+   upper level (``recordModelledEmission``).
+
+Members: ``nLevels()``, ``nLines()``, ``levels()``. Constants: exact SI 2019
+:math:`k_B, h, c, e`.
+
+diatomicBands
+-------------
+
+``src/radiation/radiators/derived/diatomicBands/``: ``diatomicBands.H``,
+``diatomicBands.C`` (constructor, per-cell coefficients),
+``diatomicBandsRead.C`` (molecule file), ``diatomicBandsLines.C`` (line
+positions, Hoenl-London factors, levels).
+
+Bound-bound emission and absorption of a diatomic molecule or diatomic
+ion from the band systems of a molecule file of the database
+(:doc:`database`). Every ``[band-...]`` block of the file is computed;
+there is no band selection.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 14 52
+
+   * - Keyword (``diatomicBandsCoeffs``)
+     - Type
+     - Default
+     - Meaning
+   * - ``transitionFile``
+     - fileName
+     - required
+     - molecule file (environment variables expanded)
+
+.. code-block:: cpp
+
+   N2
+   {
+       model           diatomicBands;
+       mass            4.652e-26;      // [kg]
+       radius          0;              // unused by this class
+
+       diatomicBandsCoeffs
+       {
+           transitionFile  "$RADIATIONFOAM_DIR/src/radiation/database/molecules/N2.dat";
+       }
+   }
+
+Construction (once):
+
+* ``readParade`` reads the states, bands, 17 constants per state and the
+  transition rows (records starting with ``c`` are comments; exactly one
+  record is skipped after each row count, item 1 of the header); it
+  converts energies from cm\ :sup:`-1` to J and :math:`r_e` from cm to m;
+* the log lists every band (upper and lower state, type, rows, rows not
+  read);
+* ``buildLines`` builds, per row :math:`(v', v'')`, the band origin, the
+  band strength :math:`c_S` and every rotational line of the transition
+  type (1 to 6; another type is a fatal error): wavenumber, emission
+  factor per unit :math:`n_u/g_u`, absorption factor per unit
+  :math:`n_l/g_l - n_u/g_u`, rotational term difference
+  :math:`F' - F''`, and the indices of its upper and lower level; it
+  creates the levels (key, :math:`g`, energy parts) and copies the state
+  constants into the ``radiationLevels``;
+* the log gives the number of vibrational transitions, lines and levels.
+
+Fatal errors at construction: a band referring to a state outside
+``[Energy-Levels]``, a type-3 band with ``altnat'`` :math:`\neq 0`, a type
+4-6 band with :math:`k_{\max} > 500`, the two states of a type 3/5/6 band
+with different spins, a spin :math:`S > 1` in the matrix method, a level
+reached with two different energies, a level outside the key range.
+
+Per cell (``addEmissionAbsorption``):
+
+1. skip if :math:`n < 10` m\ :sup:`-3` or :math:`T_{\mathrm{trans}} < 10` K,
+   or if the population model returns no population;
+2. compute the foreign-gas density and molar mass;
+3. per vibrational transition: skip if outside the window (origin test);
+   compute the Doppler, self, foreign, natural and Stark widths at the
+   band origin, the Voigt width and the 2001-point cumulative Whiting
+   table over :math:`\pm 25` Voigt widths;
+4. per line: :math:`\epsilon = ` emission factor :math:`\times n_u/g_u`;
+   decide whether it is placed (``emissionSelectsLines`` of the population
+   model, threshold :math:`10^{-25}` in the code's units); get
+   :math:`n_l/g_l` from ``lineLowerPopulation``; place the bin integrals of
+   the cumulative profile on the grid; add :math:`\epsilon/10^{10}\,\phi_i`
+   and :math:`k/10^{10}\,\phi_i` (signed);
+5. as ``atomicLines``, report modelled-level emission when the population
+   model models levels.
+
+Members: ``nLines()``, ``levels()``. Constants: exact SI 2019
+:math:`k_B, h, c`, CODATA 2018 atomic mass unit,
+:math:`e a_0 = 2.5415785\times10^{-18}` esu cm.
+
+The header ``diatomicBands.H`` lists, as items 1-13, the forms of the
+verified version that are kept on purpose (reader, :math:`k_{\max}`,
+type-specific terms, widths); they are summarised in
+:doc:`/theory/diatomic_bands`.
