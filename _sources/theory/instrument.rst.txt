@@ -137,9 +137,13 @@ Using the bin mass :math:`C(e_{i+1}-y_j) - C(e_i-y_j)` instead of a sampled
   as on a detector of finite size.
 
 The cost is :math:`O(NM)` with :math:`M` the number of points within the
-kernel support. On a uniform grid the interior weights depend on
-:math:`i - j` only and are computed once per call
-(:math:`2M+2` evaluations of :math:`C`).
+kernel support. On a uniform grid (every spacing within :math:`10^{-10}` of
+the mean, relative) the interior weights depend on :math:`i - j` only and are
+computed once per call (:math:`2M+2` evaluations of :math:`C`). On any other
+grid the :math:`NM` weights and the :math:`n_j` are computed once and stored with
+the grid, and reused while the following calls pass the same grid (the spatial
+convolution: one call per wavelength on the same cell centres); the result is
+the same bit for bit (store capped at :math:`2^{25}` weights).
 
 .. tip::
 
@@ -227,7 +231,13 @@ normalisation "is not expressed analytically, and must be done numerically"
 and give no range; the EAST decks of the tutorials use 10 nm (sqrt-Voigt) and
 20 nm (Gauss + Lorentz) and flag the value as unpublished
 (:doc:`/examples/east5029`). ILS2 is truncated at :math:`R` and renormalised
-with its analytic CDF.
+with its analytic CDF. The kernel is zero beyond :math:`\pm R`: next to a
+saturated line the measured spectrum drops at exactly :math:`R` from it. In the
+EAST 57-16 VUV spectrum, :math:`R` = 10 nm leaves 0.15 of the measured floor
+between the N I multiplets at 149.3 and 174.3 nm, 25-50 nm or the camera
+range bracket it; the VUV 170-180 nm window changes by -6.5 % from 10 to
+50 nm, the other windows by less than 0.5 % (``docs/reports/EAST_ILS_CUTOFF_20261117.md``;
+override ``cutoff`` and ``windowMargin`` per camera in a case).
 
 .. figure:: /_static/figures/theory/instrument_ils.png
    :width: 60%

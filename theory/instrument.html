@@ -651,9 +651,13 @@ to round-off for any grid and any kernel. With <code class="docutils literal not
 as on a detector of finite size.</p></li>
 </ul>
 <p>The cost is <span class="math notranslate nohighlight">\(O(NM)\)</span> with <span class="math notranslate nohighlight">\(M\)</span> the number of points within the
-kernel support. On a uniform grid the interior weights depend on
-<span class="math notranslate nohighlight">\(i - j\)</span> only and are computed once per call
-(<span class="math notranslate nohighlight">\(2M+2\)</span> evaluations of <span class="math notranslate nohighlight">\(C\)</span>).</p>
+kernel support. On a uniform grid (every spacing within <span class="math notranslate nohighlight">\(10^{-10}\)</span> of
+the mean, relative) the interior weights depend on <span class="math notranslate nohighlight">\(i - j\)</span> only and are
+computed once per call (<span class="math notranslate nohighlight">\(2M+2\)</span> evaluations of <span class="math notranslate nohighlight">\(C\)</span>). On any other
+grid the <span class="math notranslate nohighlight">\(NM\)</span> weights and the <span class="math notranslate nohighlight">\(n_j\)</span> are computed once and stored with
+the grid, and reused while the following calls pass the same grid (the spatial
+convolution: one call per wavelength on the same cell centres); the result is
+the same bit for bit (store capped at <span class="math notranslate nohighlight">\(2^{25}\)</span> weights).</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p>Because the convolution conserves the integral, a band integral taken over
@@ -722,7 +726,13 @@ normalisation “is not expressed analytically, and must be done numerically”
 and give no range; the EAST decks of the tutorials use 10 nm (sqrt-Voigt) and
 20 nm (Gauss + Lorentz) and flag the value as unpublished
 (<a class="reference internal" href="../examples/east5029.html"><span class="doc">EAST shot 50-29 on a dsmcFoam run</span></a>). ILS2 is truncated at <span class="math notranslate nohighlight">\(R\)</span> and renormalised
-with its analytic CDF.</p>
+with its analytic CDF. The kernel is zero beyond <span class="math notranslate nohighlight">\(\pm R\)</span>: next to a
+saturated line the measured spectrum drops at exactly <span class="math notranslate nohighlight">\(R\)</span> from it. In the
+EAST 57-16 VUV spectrum, <span class="math notranslate nohighlight">\(R\)</span> = 10 nm leaves 0.15 of the measured floor
+between the N I multiplets at 149.3 and 174.3 nm, 25-50 nm or the camera
+range bracket it; the VUV 170-180 nm window changes by -6.5 % from 10 to
+50 nm, the other windows by less than 0.5 % (<code class="docutils literal notranslate"><span class="pre">docs/reports/EAST_ILS_CUTOFF_20261117.md</span></code>;
+override <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> and <code class="docutils literal notranslate"><span class="pre">windowMargin</span></code> per camera in a case).</p>
 <figure class="align-center" id="id1">
 <a class="reference internal image-reference" href="../_images/instrument_ils.png"><img alt="../_images/instrument_ils.png" src="../_images/instrument_ils.png" style="width: 60%;" />
 </a>
