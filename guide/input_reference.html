@@ -1839,7 +1839,7 @@ warning). A sub-dictionary with none of the three is a FatalIOError.</p>
 <span class="w">            </span><span class="n">form</span><span class="w">            </span><span class="n">sqrtVoigt</span><span class="p">;</span>
 <span class="w">            </span><span class="n">halfWidthGauss</span><span class="w">  </span><span class="mf">0.084</span><span class="p">;</span>
 <span class="w">            </span><span class="n">halfWidthLorentz</span><span class="w"> </span><span class="mf">0.0025</span><span class="p">;</span>
-<span class="w">            </span><span class="n">cutoff</span><span class="w">          </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">            </span><span class="n">cutoff</span><span class="w">          </span><span class="mf">56.1</span><span class="p">;</span><span class="w">       </span><span class="c1">// camera width: the line shape spans the detector</span>
 <span class="w">        </span><span class="p">}</span>
 <span class="w">        </span><span class="n">spatialResponse</span>
 <span class="w">        </span><span class="p">{</span>
@@ -1916,6 +1916,15 @@ or <code class="docutils literal notranslate"><span class="pre">nm</span></code>
 <td><p><code class="docutils literal notranslate"><span class="pre">true</span></code>: the part of a kernel that falls outside the window is
 given back to the window, so the trapezoid integral is conserved to
 round-off. <code class="docutils literal notranslate"><span class="pre">false</span></code>: it is lost, as on a detector of finite size.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">instrumentFunction.C</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">convolution</span></code></p></td>
+<td><p>word</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code></p></td>
+<td><p>Sum over the sources on a uniform grid: <code class="docutils literal notranslate"><span class="pre">direct</span></code>, <code class="docutils literal notranslate"><span class="pre">fft</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">auto</span></code> (FFT when the kernel stencil is wider than the grid and the
+grid has at least 4096 points). Same weights and normalisation; the
+two differ by round-off only.</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">instrumentFunction.C</span></code></p></td>
 </tr>
 </tbody>

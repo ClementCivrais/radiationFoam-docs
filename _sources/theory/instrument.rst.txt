@@ -143,7 +143,16 @@ computed once per call (:math:`2M+2` evaluations of :math:`C`). On any other
 grid the :math:`NM` weights and the :math:`n_j` are computed once and stored with
 the grid, and reused while the following calls pass the same grid (the spatial
 convolution: one call per wavelength on the same cell centres); the result is
-the same bit for bit (store capped at :math:`2^{25}` weights).
+the same bit for bit (store capped at :math:`2^{25}` weights). A kernel that
+spans the window on a uniform grid (stencil :math:`2M+1 > N`, :math:`N \ge
+4096`; the EAST line shape over the detector) makes the sum a linear
+convolution of the amplitudes :math:`c_j/n_j` with the interior weights
+:math:`w(i-j)`: it is done by FFT (radix 2, length :math:`L \ge N + 2M`,
+:math:`O(L \log L)` instead of :math:`O(N^2)`), :math:`n_j` from prefix sums of the
+same weights and the two half bins at the grid ends with their exact weights;
+the result differs from the direct sum by round-off only (at most
+:math:`5\times 10^{-14}` relative on the 57-16 VUV spectrum; option
+``convolution``).
 
 .. tip::
 
@@ -225,19 +234,27 @@ the two forms are
 ILS1 is used below 500 nm and for the camera part of the spatial function;
 ILS2 for the longer-wavelength cameras. The square root of a Voigt decays as
 :math:`1/|s|`, so its integral diverges: the normalisation needs a finite half
-range :math:`R` (``cutoff``, mandatory), and the result depends on it
-logarithmically. Brandis and Cruden (2017, App. C) state that the
-normalisation "is not expressed analytically, and must be done numerically"
-and give no range; the EAST decks of the tutorials use 10 nm (sqrt-Voigt) and
-20 nm (Gauss + Lorentz) and flag the value as unpublished
-(:doc:`/examples/east5029`). ILS2 is truncated at :math:`R` and renormalised
-with its analytic CDF. The kernel is zero beyond :math:`\pm R`: next to a
-saturated line the measured spectrum drops at exactly :math:`R` from it. In the
-EAST 57-16 VUV spectrum, :math:`R` = 10 nm leaves 0.15 of the measured floor
-between the N I multiplets at 149.3 and 174.3 nm, 25-50 nm or the camera
-range bracket it; the VUV 170-180 nm window changes by -6.5 % from 10 to
-50 nm, the other windows by less than 0.5 % (``docs/reports/EAST_ILS_CUTOFF_20261117.md``;
-override ``cutoff`` and ``windowMargin`` per camera in a case).
+range :math:`R` (``cutoff``, mandatory). Brandis and Cruden (2017, App. C)
+write the normalisation integral to infinity, state that it "is not expressed
+analytically, and must be done numerically" and give no range. The database
+applies both forms over the detector (since 2026-11-17): the window is the
+camera range (``windowMargin 0``), :math:`R` is the width of the camera range,
+so that the kernel of every source spans the detector, and every kernel is
+normalised over it (``conserveAtEdges``). The long-range wings are produced
+by the intensified CCD (Brandis et al. 2015, p. 213; "the profile of
+radiation falling on the CCD coupled with the charge spread function of the
+CCD", Brandis and Cruden 2017, Sec. IV.A), which spreads only the light that
+falls on it, and the functions are "normalized to conserve the area under the
+curve" (ibid.): the integral of the measured spectrum over the camera range
+equals that of the source spectrum. A band that extends beyond the camera
+range is integrated over the overlap (the 170-180 nm window of a camera that
+ends at 178 nm). In the EAST 57-16 VUV spectrum the floor between the N I
+multiplets at 149.3 and 174.3 nm (159.5-164 nm) is 0.95 of EAST with this rule
+and 0.14 with the former :math:`R` = 10 nm (which cut it off at exactly 10 nm
+from both multiplets); over ten Test 57 shots the floor follows the line
+content of the camera (``docs/reports/EAST_VUV_FLOOR_FIX_20261117.md``; the
+former range study ``docs/reports/EAST_ILS_CUTOFF_20261117.md``). ILS2 is
+truncated at :math:`R` and renormalised with its analytic CDF.
 
 .. figure:: /_static/figures/theory/instrument_ils.png
    :width: 60%

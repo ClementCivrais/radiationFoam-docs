@@ -117,9 +117,11 @@ One case
 Every case is a ``shockTube1D`` deck with a 3-cell uniform profile
 (:math:`x` = 0, 5 and 10 cm, written to ``constant/profile.csv``) at the
 equilibrium state, every temperature equal to :math:`T_2` and
-:math:`T_e = T_2`, and one camera ``C``. The window is the benchmark window
-widened by the ILS cut-off on both sides, so that the measured spectrum is
-complete at the band edges. Abbreviated deck of ``bench_50-36_UVVis``:
+:math:`T_e = T_2`, and one camera ``C``. The window is the camera range of the
+shot (the detector: since 2026-11-17 the EAST line shapes of the
+``eastLineShape`` type span it and are normalised over it; a Gaussian ILS keeps
+the benchmark window widened by ten half widths). Abbreviated deck of
+``bench_50-36_UVVis`` (long form):
 
 .. code-block:: cpp
 
@@ -134,7 +136,7 @@ complete at the band edges. Abbreviated deck of ``bench_50-36_UVVis``:
    shockTube1DCoeffs
    {
        diameter            0.1016;
-       windows { W { minWavelength 329; maxWavelength 481; nPoints 76001; } }
+       windows { W { minWavelength 327.7; maxWavelength 502; nPoints 87151; } }
        bands   { UVVis (339 471); }
        profile { source macroFile; file "<case>/constant/profile.csv"; }
        writeSpectra        none;
@@ -145,7 +147,7 @@ complete at the band edges. Abbreviated deck of ``bench_50-36_UVVis``:
            {
                window          W;
                spectralResponse { type eastLineShape; lengthUnit nm; form sqrtVoigt;
-                                  halfWidthGauss 0.28; halfWidthLorentz 0.07; cutoff 10; }
+                                  halfWidthGauss 0.28; halfWidthLorentz 0.07; cutoff 174.3; }
                bandUnit        nm;
                bands           { UVVis (339 471); }
                shockFront      { position 0; band UVVis; upstreamSide low; }

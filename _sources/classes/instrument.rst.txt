@@ -60,6 +60,14 @@ the ``type`` entry of its dictionary.
      - Renormalise each kernel to the part inside the window, so the
        trapezoid integral is conserved; ``false`` loses the content scattered
        beyond the window edges.
+   * - ``convolution``
+     - word
+     - ``auto``
+     - Sum over the sources on a uniform grid: ``direct``, ``fft`` (linear
+       convolution by FFT, same weights and normalisation, round-off
+       differences only) or ``auto`` (FFT when the kernel stencil is wider
+       than the grid, :math:`2M+1 > N`, and :math:`N \ge 4096`: a kernel
+       that spans the window, as the EAST line shape over the detector).
 
 Main member functions:
 
@@ -326,7 +334,9 @@ at half maximum of their tables.
      - scalar
      - (required)
      - Half range :math:`R` [lengthUnit] of the normalisation (sqrt-Voigt)
-       or of the truncation (Gauss + Lorentz).
+       or of the truncation (Gauss + Lorentz). The EAST database gives the
+       width of the camera range (with ``windowMargin 0``): the line shape
+       spans the detector and is normalised over it (``conserveAtEdges``).
    * - ``resolution``
      - scalar
      - ``100``
@@ -458,7 +468,7 @@ by its keyword. Besides the keywords above, ``shockTube1D.C`` reads:
            spectralResponse
            {
                type eastLineShape; lengthUnit nm; form sqrtVoigt;
-               halfWidthGauss 0.28; halfWidthLorentz 0.070; cutoff 10;
+               halfWidthGauss 0.28; halfWidthLorentz 0.070; cutoff 174.3;
            }
            bands           { UVVis_EAST (328 477); }
            shockFront      { criterion peakRadiance; band UVVis_EAST; }

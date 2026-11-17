@@ -608,6 +608,15 @@ the <code class="docutils literal notranslate"><span class="pre">type</span></co
 trapezoid integral is conserved; <code class="docutils literal notranslate"><span class="pre">false</span></code> loses the content scattered
 beyond the window edges.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">convolution</span></code></p></td>
+<td><p>word</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code></p></td>
+<td><p>Sum over the sources on a uniform grid: <code class="docutils literal notranslate"><span class="pre">direct</span></code>, <code class="docutils literal notranslate"><span class="pre">fft</span></code> (linear
+convolution by FFT, same weights and normalisation, round-off
+differences only) or <code class="docutils literal notranslate"><span class="pre">auto</span></code> (FFT when the kernel stencil is wider
+than the grid, <span class="math notranslate nohighlight">\(2M+1 &gt; N\)</span>, and <span class="math notranslate nohighlight">\(N \ge 4096\)</span>: a kernel
+that spans the window, as the EAST line shape over the detector).</p></td>
+</tr>
 </tbody>
 </table>
 <p>Main member functions:</p>
@@ -931,7 +940,9 @@ at half maximum of their tables.</p>
 <td><p>scalar</p></td>
 <td><p>(required)</p></td>
 <td><p>Half range <span class="math notranslate nohighlight">\(R\)</span> [lengthUnit] of the normalisation (sqrt-Voigt)
-or of the truncation (Gauss + Lorentz).</p></td>
+or of the truncation (Gauss + Lorentz). The EAST database gives the
+width of the camera range (with <code class="docutils literal notranslate"><span class="pre">windowMargin</span> <span class="pre">0</span></code>): the line shape
+spans the detector and is normalised over it (<code class="docutils literal notranslate"><span class="pre">conserveAtEdges</span></code>).</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolution</span></code></p></td>
 <td><p>scalar</p></td>
@@ -1092,7 +1103,7 @@ or <code class="docutils literal notranslate"><span class="pre">metric</span> <s
 <span class="w">        </span><span class="n">spectralResponse</span>
 <span class="w">        </span><span class="p">{</span>
 <span class="w">            </span><span class="n">type</span><span class="w"> </span><span class="n">eastLineShape</span><span class="p">;</span><span class="w"> </span><span class="n">lengthUnit</span><span class="w"> </span><span class="n">nm</span><span class="p">;</span><span class="w"> </span><span class="n">form</span><span class="w"> </span><span class="n">sqrtVoigt</span><span class="p">;</span>
-<span class="w">            </span><span class="n">halfWidthGauss</span><span class="w"> </span><span class="mf">0.28</span><span class="p">;</span><span class="w"> </span><span class="n">halfWidthLorentz</span><span class="w"> </span><span class="mf">0.070</span><span class="p">;</span><span class="w"> </span><span class="n">cutoff</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">            </span><span class="n">halfWidthGauss</span><span class="w"> </span><span class="mf">0.28</span><span class="p">;</span><span class="w"> </span><span class="n">halfWidthLorentz</span><span class="w"> </span><span class="mf">0.070</span><span class="p">;</span><span class="w"> </span><span class="n">cutoff</span><span class="w"> </span><span class="mf">174.3</span><span class="p">;</span>
 <span class="w">        </span><span class="p">}</span>
 <span class="w">        </span><span class="n">bands</span><span class="w">           </span><span class="p">{</span><span class="w"> </span><span class="n">UVVis_EAST</span><span class="w"> </span><span class="p">(</span><span class="mi">328</span><span class="w"> </span><span class="mi">477</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
 <span class="w">        </span><span class="n">shockFront</span><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="n">criterion</span><span class="w"> </span><span class="n">peakRadiance</span><span class="p">;</span><span class="w"> </span><span class="n">band</span><span class="w"> </span><span class="n">UVVis_EAST</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>

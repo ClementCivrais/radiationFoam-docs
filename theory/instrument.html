@@ -657,7 +657,16 @@ computed once per call (<span class="math notranslate nohighlight">\(2M+2\)</spa
 grid the <span class="math notranslate nohighlight">\(NM\)</span> weights and the <span class="math notranslate nohighlight">\(n_j\)</span> are computed once and stored with
 the grid, and reused while the following calls pass the same grid (the spatial
 convolution: one call per wavelength on the same cell centres); the result is
-the same bit for bit (store capped at <span class="math notranslate nohighlight">\(2^{25}\)</span> weights).</p>
+the same bit for bit (store capped at <span class="math notranslate nohighlight">\(2^{25}\)</span> weights). A kernel that
+spans the window on a uniform grid (stencil <span class="math notranslate nohighlight">\(2M+1 &gt; N\)</span>, <span class="math notranslate nohighlight">\(N \ge
+4096\)</span>; the EAST line shape over the detector) makes the sum a linear
+convolution of the amplitudes <span class="math notranslate nohighlight">\(c_j/n_j\)</span> with the interior weights
+<span class="math notranslate nohighlight">\(w(i-j)\)</span>: it is done by FFT (radix 2, length <span class="math notranslate nohighlight">\(L \ge N + 2M\)</span>,
+<span class="math notranslate nohighlight">\(O(L \log L)\)</span> instead of <span class="math notranslate nohighlight">\(O(N^2)\)</span>), <span class="math notranslate nohighlight">\(n_j\)</span> from prefix sums of the
+same weights and the two half bins at the grid ends with their exact weights;
+the result differs from the direct sum by round-off only (at most
+<span class="math notranslate nohighlight">\(5\times 10^{-14}\)</span> relative on the 57-16 VUV spectrum; option
+<code class="docutils literal notranslate"><span class="pre">convolution</span></code>).</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p>Because the convolution conserves the integral, a band integral taken over
@@ -720,19 +729,27 @@ L(s) = \frac{1}{\pi w_L}\,\frac{1}{(s/w_L)^2 + 1},
 <p>ILS1 is used below 500 nm and for the camera part of the spatial function;
 ILS2 for the longer-wavelength cameras. The square root of a Voigt decays as
 <span class="math notranslate nohighlight">\(1/|s|\)</span>, so its integral diverges: the normalisation needs a finite half
-range <span class="math notranslate nohighlight">\(R\)</span> (<code class="docutils literal notranslate"><span class="pre">cutoff</span></code>, mandatory), and the result depends on it
-logarithmically. Brandis and Cruden (2017, App. C) state that the
-normalisation “is not expressed analytically, and must be done numerically”
-and give no range; the EAST decks of the tutorials use 10 nm (sqrt-Voigt) and
-20 nm (Gauss + Lorentz) and flag the value as unpublished
-(<a class="reference internal" href="../examples/east5029.html"><span class="doc">EAST shot 50-29 on a dsmcFoam run</span></a>). ILS2 is truncated at <span class="math notranslate nohighlight">\(R\)</span> and renormalised
-with its analytic CDF. The kernel is zero beyond <span class="math notranslate nohighlight">\(\pm R\)</span>: next to a
-saturated line the measured spectrum drops at exactly <span class="math notranslate nohighlight">\(R\)</span> from it. In the
-EAST 57-16 VUV spectrum, <span class="math notranslate nohighlight">\(R\)</span> = 10 nm leaves 0.15 of the measured floor
-between the N I multiplets at 149.3 and 174.3 nm, 25-50 nm or the camera
-range bracket it; the VUV 170-180 nm window changes by -6.5 % from 10 to
-50 nm, the other windows by less than 0.5 % (<code class="docutils literal notranslate"><span class="pre">docs/reports/EAST_ILS_CUTOFF_20261117.md</span></code>;
-override <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> and <code class="docutils literal notranslate"><span class="pre">windowMargin</span></code> per camera in a case).</p>
+range <span class="math notranslate nohighlight">\(R\)</span> (<code class="docutils literal notranslate"><span class="pre">cutoff</span></code>, mandatory). Brandis and Cruden (2017, App. C)
+write the normalisation integral to infinity, state that it “is not expressed
+analytically, and must be done numerically” and give no range. The database
+applies both forms over the detector (since 2026-11-17): the window is the
+camera range (<code class="docutils literal notranslate"><span class="pre">windowMargin</span> <span class="pre">0</span></code>), <span class="math notranslate nohighlight">\(R\)</span> is the width of the camera range,
+so that the kernel of every source spans the detector, and every kernel is
+normalised over it (<code class="docutils literal notranslate"><span class="pre">conserveAtEdges</span></code>). The long-range wings are produced
+by the intensified CCD (Brandis et al. 2015, p. 213; “the profile of
+radiation falling on the CCD coupled with the charge spread function of the
+CCD”, Brandis and Cruden 2017, Sec. IV.A), which spreads only the light that
+falls on it, and the functions are “normalized to conserve the area under the
+curve” (ibid.): the integral of the measured spectrum over the camera range
+equals that of the source spectrum. A band that extends beyond the camera
+range is integrated over the overlap (the 170-180 nm window of a camera that
+ends at 178 nm). In the EAST 57-16 VUV spectrum the floor between the N I
+multiplets at 149.3 and 174.3 nm (159.5-164 nm) is 0.95 of EAST with this rule
+and 0.14 with the former <span class="math notranslate nohighlight">\(R\)</span> = 10 nm (which cut it off at exactly 10 nm
+from both multiplets); over ten Test 57 shots the floor follows the line
+content of the camera (<code class="docutils literal notranslate"><span class="pre">docs/reports/EAST_VUV_FLOOR_FIX_20261117.md</span></code>; the
+former range study <code class="docutils literal notranslate"><span class="pre">docs/reports/EAST_ILS_CUTOFF_20261117.md</span></code>). ILS2 is
+truncated at <span class="math notranslate nohighlight">\(R\)</span> and renormalised with its analytic CDF.</p>
 <figure class="align-center" id="id1">
 <a class="reference internal image-reference" href="../_images/instrument_ils.png"><img alt="../_images/instrument_ils.png" src="../_images/instrument_ils.png" style="width: 60%;" />
 </a>

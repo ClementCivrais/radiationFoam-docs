@@ -1088,7 +1088,7 @@ Example (one camera of ``tutorials/EAST/east5029``):
                form            sqrtVoigt;
                halfWidthGauss  0.084;
                halfWidthLorentz 0.0025;
-               cutoff          10;
+               cutoff          56.1;       // camera width: the line shape spans the detector
            }
            spatialResponse
            {
@@ -1154,6 +1154,14 @@ dictionary (no ``Coeffs`` sub-dictionary). Entries of the base class
      - ``true``: the part of a kernel that falls outside the window is
        given back to the window, so the trapezoid integral is conserved to
        round-off. ``false``: it is lost, as on a detector of finite size.
+     - ``instrumentFunction.C``
+   * - ``convolution``
+     - word
+     - ``auto``
+     - Sum over the sources on a uniform grid: ``direct``, ``fft``, or
+       ``auto`` (FFT when the kernel stencil is wider than the grid and the
+       grid has at least 4096 points). Same weights and normalisation; the
+       two differ by round-off only.
      - ``instrumentFunction.C``
 
 Coefficients of each type (lengths in ``lengthUnit``):

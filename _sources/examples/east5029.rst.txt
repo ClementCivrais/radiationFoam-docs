@@ -93,8 +93,8 @@ Its main entries:
 
        windows
        {
-           VUV     { minWavelength 150; maxWavelength 230; nPoints 40001; }
-           UVVis   { minWavelength 310; maxWavelength 510; nPoints 100001; }
+           VUV     { minWavelength 161.9; maxWavelength 218; nPoints 28051; }
+           UVVis   { minWavelength 327.7; maxWavelength 502; nPoints 87151; }
        }
 
        bands                               // raw (unconvolved) bands [nm]
@@ -125,9 +125,10 @@ Its main entries:
    }
 
 ``windows``
-   Each window is the camera range of 50-29 widened by the ILS cut-off on both
-   sides (VUV spectra 160-220 nm, profile 162-218 nm; UV/Vis spectra
-   320-500 nm, profile 328-477 nm), at 2 pm spacing.
+   Each window is the camera range of 50-29, i.e. the detector (VUV
+   161.9-218.0 nm, profile 162-218 nm; UV/Vis 327.7-502.0 nm, profile
+   328-477 nm; since 2026-11-17 without margin: the line shape spans the
+   detector), at 2 pm spacing.
 
 ``profile``, ``distribution``
    The two dsmcFoam inputs; ``$DSMC_CASE`` and ``$RADDIST_DIR`` are set by
@@ -150,7 +151,7 @@ The VUV camera:
            form            sqrtVoigt;
            halfWidthGauss  0.084;
            halfWidthLorentz 0.0025;
-           cutoff          10;         // FLAG: not published
+           cutoff          56.1;       // the camera width: spans the detector (FLAG: range not published)
        }
 
        // SRF = f_opt (x) f_cam (x) f_motion, Table D3: d_opt 0.041 cm,
@@ -202,12 +203,14 @@ The header of the deck lists the instrument values that are provisional:
 * **The sqrt-Voigt normalisation range** (``cutoff``) of the ILS and of the
   camera spatial function: Brandis and Cruden (2017) App. C say only that the
   normalisation "is not expressed analytically, and must be done
-  numerically". The peak of the normalised ILS changes by 16 % (VUV) and 37 %
-  (UV/Vis) between cut-offs of 1 and 10 nm, the camera SRF peak by 33 % (VUV)
-  between 0.5 and 2 cm. Band integrals over the EAST windows are insensitive;
-  peak spectral radiance and profile peaks are not. The spatial cut-off of
-  10 cm reproduces the SRF tabulated on -10..10 cm in the public Test 59
-  release to 3 % of the peak; the spectral 10 nm has no evidence.
+  numerically". Since 2026-11-17 the ILS spans the detector: the window is
+  the camera range, the cut-off its width and every kernel is normalised over
+  it (the long-range wings come from the intensified CCD, which spreads only
+  the light that falls on it; Brandis et al. 2015, Brandis and Cruden 2017
+  Sec. IV.A); the 57-16 VUV floor between the N I multiplets selects it
+  (``docs/reports/EAST_VUV_FLOOR_FIX_20261117.md``; the former 10 nm left
+  0.14 of it). The spatial cut-off of 10 cm reproduces the SRF tabulated on
+  -10..10 cm in the public Test 59 release to 3 % of the peak.
 * **The optics width**: Eq. D1 is a triangle of *base* :math:`d_\mathrm{opt}`
   (used here, 0.041 cm); the public Test 57 release defines the same 0.041 cm
   as a *half* width. The factor 2 is negligible against the gate top hat.
