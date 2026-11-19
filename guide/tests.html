@@ -148,6 +148,7 @@
 </ul>
 </li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Tests</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#running-from-dsmc-rovibronic">Running from DSMC_Rovibronic</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#the-instrument-test-suite">The instrument test suite</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#tutorial-based-checks">Tutorial-based checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#which-outputs-must-stay-identical">Which outputs must stay identical</a><ul>
@@ -476,6 +477,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/east_validation.html">EAST radiance validation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#equilibrium-columns">Equilibrium columns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#shot-57-16-vuv-peaks">Shot 57-16 VUV peaks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#extended-tests-50-and-57">Extended Tests 50 and 57</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#dsmc-production-comparison-for-shot-50-29">DSMC production comparison for shot 50-29</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#verification">Verification</a></li>
@@ -558,6 +560,17 @@ and the tutorials, whose outputs serve as regression references. The
 present page explains how to run both and what must stay identical after a
 code change. The history of the verification (what was compared with what,
 and the outcome) is in <a class="reference internal" href="../reference/verification.html"><span class="doc">Verification Record</span></a>.</p>
+<section id="running-from-dsmc-rovibronic">
+<h2>Running from DSMC_Rovibronic<a class="headerlink" href="#running-from-dsmc-rovibronic" title="Link to this heading"></a></h2>
+<p>From the DSMC_Rovibronic root, run <code class="docutils literal notranslate"><span class="pre">run/regression/run_regression.sh</span> <span class="pre">radiation</span></code>
+to check the instrument, line widths, atomic populations, band integration and
+two calibrated EAST camera decks. The shot 57-16 test also checks the measured
+carbon peak positions and the excess above the computed air spectrum. Run <code class="docutils literal notranslate"><span class="pre">run/RAD/regression/Allrun</span> <span class="pre">--full</span></code>
+for all 50 equilibrium decks, their archived checksums, input overrides and
+the radiationFoam regression suite. Both commands use the installed executables
+and a sibling radiationFoam checkout, or the checkout named by
+<code class="docutils literal notranslate"><span class="pre">RADIATIONFOAM_DIR</span></code>. The runner prints its work directory.</p>
+</section>
 <section id="the-instrument-test-suite">
 <h2>The instrument test suite<a class="headerlink" href="#the-instrument-test-suite" title="Link to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">Test-radiationInstrument</span></code>

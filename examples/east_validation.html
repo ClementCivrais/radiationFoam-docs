@@ -148,6 +148,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../guide/tests.html">Tests</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#running-from-dsmc-rovibronic">Running from DSMC_Rovibronic</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#the-instrument-test-suite">The instrument test suite</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#tutorial-based-checks">Tutorial-based checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../guide/tests.html#which-outputs-must-stay-identical">Which outputs must stay identical</a><ul>
@@ -476,6 +477,7 @@
 </li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">EAST radiance validation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#equilibrium-columns">Equilibrium columns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#shot-57-16-vuv-peaks">Shot 57-16 VUV peaks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#extended-tests-50-and-57">Extended Tests 50 and 57</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dsmc-production-comparison-for-shot-50-29">DSMC production comparison for shot 50-29</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#verification">Verification</a></li>
@@ -617,9 +619,8 @@ The nominal 170–180 nm band ends at 178 nm for the Test 57 VUV camera.</p>
 <a class="reference internal image-reference" href="../_images/east_equilibrium.png"><img alt="../_images/east_equilibrium.png" src="../_images/east_equilibrium.png" style="width: 85%;" />
 </a>
 <figcaption>
-<p><span class="caption-text">Each circle represents one shot. The shaded interval marks ±30% of the
-measured radiance as a calibration guide. It is wider than the spread of
-the Vis/NIR and IR ratios and narrower than the discrepancies for some UV shots.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+<p><span class="caption-text">Measured and calculated equilibrium band radiance versus shock speed.
+Each pair of points refers to the same shot and camera window.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>The baseline reproduced all 236 archived output files from revision
@@ -649,6 +650,34 @@ integral for 50-29 and 0.427 of the 190–350 nm integral for 57-16.</span><a cl
 <a class="reference download internal" download="" href="../_downloads/0cd30fe28fcc5daaec1fe8fa1d24a123/cubes.csv"><code class="xref download docutils literal notranslate"><span class="pre">VUV</span> <span class="pre">spectra</span> <span class="pre">integrals</span></code></a>,
 <a class="reference download internal" download="" href="../_downloads/5f8d9ef5e66a03303be9449380c88033/blue.csv"><code class="xref download docutils literal notranslate"><span class="pre">UV/Vis</span> <span class="pre">spectra</span> <span class="pre">integrals</span></code></a>,
 <a class="reference download internal" download="" href="../_downloads/a4f7107b068a224f315db22c470e75d8/floor.csv"><code class="xref download docutils literal notranslate"><span class="pre">VUV</span> <span class="pre">floor</span> <span class="pre">measurements</span></code></a>.</p>
+</section>
+<section id="shot-57-16-vuv-peaks">
+<span id="east57-vuv-peaks"></span><h2>Shot 57-16 VUV peaks<a class="headerlink" href="#shot-57-16-vuv-peaks" title="Link to this heading"></a></h2>
+<p>The calibrated camera records maxima at 156.55 and 166.13 nm. Their positions,
+after accounting for the wavelength offset visible in the nitrogen multiplets,
+match the neutral carbon (C I) multiplets at 156.1 and 165.7 nm. The equilibrium
+air calculation omits carbon. At the two measured peak pixels, EAST gives
+399.5 and 410.1 versus 30.0 and 26.9 W cm<sup>−2</sup> sr<sup>−1</sup>
+µm<sup>−1</sup> calculated. The neighbouring nitrogen peak is present in both
+spectra at 149.70 nm measured and 149.37 nm calculated. A weaker measured
+feature at 157.92 nm remains unassigned.</p>
+<figure class="align-center" id="id3">
+<a class="reference internal image-reference" href="../_images/east_spectrum_57-16_VUV_detail.png"><img alt="../_images/east_spectrum_57-16_VUV_detail.png" src="../_images/east_spectrum_57-16_VUV_detail.png" style="width: 58%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Spectral radiance across the two carbon multiplets on the original detector
+wavelength scale. The comparison includes all measured pixels in this interval.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Brandis, Johnston and Cruden report 0.04 mol% CO₂ in the Test 57 fill. A
+separate uniform equilibrium carbon slab at this abundance predicts carbon
+contributions of 0.233 and 0.534 W cm<sup>−2</sup> sr<sup>−1</sup> inside
+155.83–157.12 and 165.45–166.82 nm. The measured excesses above the air
+calculation are 0.247 and 0.244 in the same units. The uniform slab accounts
+for 94% of the first excess and 219% of the second. See the <a class="reference download internal" download="" href="../_downloads/aa0ae8da809058364865ef764bf07f25/carbon_check.csv"><code class="xref download docutils literal notranslate"><span class="pre">carbon</span>
+<span class="pre">calculation</span></code></a>,
+the <a class="reference external" href="https://ntrs.nasa.gov/citations/20160009760">EAST fill composition</a>
+and the <a class="reference external" href="https://pml.nist.gov/PhysRefData/Handbook/Tables/carbontable3.htm">NIST neutral-carbon wavelengths</a>.</p>
 </section>
 <section id="extended-tests-50-and-57">
 <h2>Extended Tests 50 and 57<a class="headerlink" href="#extended-tests-50-and-57" title="Link to this heading"></a></h2>
@@ -731,13 +760,13 @@ permits a direct comparison of the three profiles on their shared coverage.</p>
 </tr>
 </tbody>
 </table>
-<figure class="align-center" id="id3">
+<figure class="align-center" id="id4">
 <a class="reference internal image-reference" href="../_images/east_50-29_profiles.png"><img alt="../_images/east_50-29_profiles.png" src="../_images/east_50-29_profiles.png" style="width: 100%;" />
 </a>
 <figcaption>
 <p><span class="caption-text">Shot 50-29 camera-band profiles aligned to their respective half-rise.
-Shading marks the downstream averaging interval. The last measured VUV
-pixel lies at 217.958 nm.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+The downstream average spans 3–4.5 cm. The last measured VUV
+pixel lies at 217.958 nm.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Downstream, the sampled populations give 0.87 of the measured VUV radiance and 0.74 of the measured UV/Vis radiance. The Boltzmann reconstruction gives 1.06 and 0.89, respectively. Over the shared near-front interval, the sampled and Boltzmann VUV integrals are 0.85 and 2.52 times EAST. In the UV/Vis those ratios are 1.04 and 1.45. At the 17 downstream diagnostic positions, the median sampled-to-Boltzmann population ratio is 1.04 for the upper term of the 174.3 nm nitrogen multiplet and 0.54 for the B state of the nitrogen molecular ion. The sampled C state of molecular nitrogen is empty at all 17 positions and the A state of nitric oxide is empty at 16. The empty groups limit what this single realisation can establish about the least populated emitters.</p>

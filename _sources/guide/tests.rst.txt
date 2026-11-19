@@ -8,6 +8,18 @@ present page explains how to run both and what must stay identical after a
 code change. The history of the verification (what was compared with what,
 and the outcome) is in :doc:`/reference/verification`.
 
+Running from DSMC_Rovibronic
+----------------------------
+
+From the DSMC_Rovibronic root, run ``run/regression/run_regression.sh radiation``
+to check the instrument, line widths, atomic populations, band integration and
+two calibrated EAST camera decks. The shot 57-16 test also checks the measured
+carbon peak positions and the excess above the computed air spectrum. Run ``run/RAD/regression/Allrun --full``
+for all 50 equilibrium decks, their archived checksums, input overrides and
+the radiationFoam regression suite. Both commands use the installed executables
+and a sibling radiationFoam checkout, or the checkout named by
+``RADIATIONFOAM_DIR``. The runner prints its work directory.
+
 The instrument test suite
 -------------------------
 

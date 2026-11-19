@@ -30,9 +30,8 @@ The nominal 170–180 nm band ends at 178 nm for the Test 57 VUV camera.
    :width: 85%
    :align: center
 
-   Each circle represents one shot. The shaded interval marks ±30% of the
-   measured radiance as a calibration guide. It is wider than the spread of
-   the Vis/NIR and IR ratios and narrower than the discrepancies for some UV shots.
+   Measured and calculated equilibrium band radiance versus shock speed.
+   Each pair of points refers to the same shot and camera window.
 
 The baseline reproduced all 236 archived output files from revision
 ``f151155``. Both builds used the same equilibrium states and detector
@@ -62,6 +61,37 @@ and increases the deficit in the deep VUV.
 :download:`VUV spectra integrals <../../../verification/eastSweep/results/cubes.csv>`,
 :download:`UV/Vis spectra integrals <../../../verification/eastSweep/results/blue.csv>`,
 :download:`VUV floor measurements <../../../verification/eastSweep/results/floor.csv>`.
+
+.. _east57-vuv-peaks:
+
+Shot 57-16 VUV peaks
+--------------------
+
+The calibrated camera records maxima at 156.55 and 166.13 nm. Their positions,
+after accounting for the wavelength offset visible in the nitrogen multiplets,
+match the neutral carbon (C I) multiplets at 156.1 and 165.7 nm. The equilibrium
+air calculation omits carbon. At the two measured peak pixels, EAST gives
+399.5 and 410.1 versus 30.0 and 26.9 W cm\ :sup:`−2` sr\ :sup:`−1`
+µm\ :sup:`−1` calculated. The neighbouring nitrogen peak is present in both
+spectra at 149.70 nm measured and 149.37 nm calculated. A weaker measured
+feature at 157.92 nm remains unassigned.
+
+.. figure:: ../../../verification/eastSweep/results/east_spectrum_57-16_VUV_detail.png
+   :width: 58%
+   :align: center
+
+   Spectral radiance across the two carbon multiplets on the original detector
+   wavelength scale. The comparison includes all measured pixels in this interval.
+
+Brandis, Johnston and Cruden report 0.04 mol% CO₂ in the Test 57 fill. A
+separate uniform equilibrium carbon slab at this abundance predicts carbon
+contributions of 0.233 and 0.534 W cm\ :sup:`−2` sr\ :sup:`−1` inside
+155.83–157.12 and 165.45–166.82 nm. The measured excesses above the air
+calculation are 0.247 and 0.244 in the same units. The uniform slab accounts
+for 94% of the first excess and 219% of the second. See the :download:`carbon
+calculation <../../../verification/eastSweep/results/carbon_check.csv>`,
+the `EAST fill composition <https://ntrs.nasa.gov/citations/20160009760>`_
+and the `NIST neutral-carbon wavelengths <https://pml.nist.gov/PhysRefData/Handbook/Tables/carbontable3.htm>`_.
 
 Extended Tests 50 and 57
 ------------------------
@@ -121,7 +151,7 @@ permits a direct comparison of the three profiles on their shared coverage.
    :align: center
 
    Shot 50-29 camera-band profiles aligned to their respective half-rise.
-   Shading marks the downstream averaging interval. The last measured VUV
+   The downstream average spans 3–4.5 cm. The last measured VUV
    pixel lies at 217.958 nm.
 
 Downstream, the sampled populations give 0.87 of the measured VUV radiance and 0.74 of the measured UV/Vis radiance. The Boltzmann reconstruction gives 1.06 and 0.89, respectively. Over the shared near-front interval, the sampled and Boltzmann VUV integrals are 0.85 and 2.52 times EAST. In the UV/Vis those ratios are 1.04 and 1.45. At the 17 downstream diagnostic positions, the median sampled-to-Boltzmann population ratio is 1.04 for the upper term of the 174.3 nm nitrogen multiplet and 0.54 for the B state of the nitrogen molecular ion. The sampled C state of molecular nitrogen is empty at all 17 positions and the A state of nitric oxide is empty at 16. The empty groups limit what this single realisation can establish about the least populated emitters.
