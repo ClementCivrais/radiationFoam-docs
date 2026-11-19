@@ -14,9 +14,12 @@ Running from DSMC_Rovibronic
 From the DSMC_Rovibronic root, run ``run/regression/run_regression.sh radiation``
 to check the instrument, line widths, atomic populations, band integration and
 two calibrated EAST camera decks. The shot 57-16 test also checks the measured
-carbon peak positions and the excess above the computed air spectrum. Run ``run/RAD/regression/Allrun --full``
+carbon peak positions and the excess above the computed air spectrum. A paired 57-16 rerun checks the complete
+carbon chemistry in the profile, the two C I line positions and six band integrals
+for both the reported fill and the CO₂-free control. Run ``run/RAD/regression/Allrun --full``
 for all 50 equilibrium decks, their archived checksums, input overrides and
-the radiationFoam regression suite. Its 26 required reference outputs are each\ncompared byte for byte. A missing or differing file fails the command. Both commands use the installed executables
+the radiationFoam regression suite. Its 26 required reference outputs are each
+compared byte for byte. A missing or differing file fails the command. Both commands use the installed executables
 and a sibling radiationFoam checkout, or the checkout named by
 ``RADIATIONFOAM_DIR``. The runner prints its work directory.
 

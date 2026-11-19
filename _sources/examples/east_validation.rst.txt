@@ -67,32 +67,70 @@ and increases the deficit in the deep VUV.
 Shot 57-16 VUV peaks
 --------------------
 
-The calibrated camera records maxima at 156.55 and 166.13 nm. Their positions,
-after accounting for the wavelength offset visible in the nitrogen multiplets,
-match the neutral carbon (C I) multiplets at 156.1 and 165.7 nm. The equilibrium
-air calculation omits carbon. At the two measured peak pixels, EAST gives
-399.5 and 410.1 versus 30.0 and 26.9 W cm\ :sup:`−2` sr\ :sup:`−1`
-µm\ :sup:`−1` calculated. The neighbouring nitrogen peak is present in both
-spectra at 149.70 nm measured and 149.37 nm calculated. A weaker measured
-feature at 157.92 nm reaches 113 in EAST and 29 in the calculated spectrum
-in the same units. Its carrier remains unassigned.
+The Test 57 fill contained 78.08 mol% N₂, 20.95 mol% O₂, 0.93 mol% Ar and
+0.04 mol% CO₂. Each incident shock was solved twice with NASA CEA 3.3.4, using
+the reported fill and a CO₂-free control with the other gases in the same
+proportions. Both predictions include Ar and Ar⁺ spectroscopy. For shot 50-29,
+the nominal fill was 79 mol% N₂ and 21 mol% O₂. Its 400 ppm CO₂ calculation is
+a sensitivity case. The spatially resolved DSMC comparison uses nominal Test 50 air.
 
-.. figure:: ../../../verification/eastSweep/results/east_spectrum_57-16_VUV_detail.png
+The equilibrium chemistry includes C, CO, CO₂, C₂, CN and their singly charged
+positive ions. At 10,414 K in shot 57-16, C and C⁺ account for 99.95% of
+the carbon nuclei. Both atomic carbon stages and the CO, CO⁺, C₂ and CN
+bands contribute to the emission and absorption of the same 10.16 cm column.
+The calculation applies the detector response after solving radiative transfer.
+
+.. csv-table:: Shot 57-16 integrated radiance in W cm⁻² sr⁻¹ on the original wavelength scales
+   :header: "Interval [nm]", "CO₂-free", "Reported fill", "EAST"
+
+   122–178,13.508,15.121,17.750
+   155.83–157.12,0.039,0.272,0.286
+   157.30–158.50,0.035,0.045,0.099
+   165.45–166.82,0.037,0.575,0.281
+   170–178,3.164,3.201,2.940
+   230–330,0.992,1.032,2.021
+
+.. figure:: ../../../verification/eastCarbon/results/east_carbon_57-16_VUV_detail.png
    :width: 58%
    :align: center
 
-   Spectral radiance across the two carbon multiplets on the original detector
-   wavelength scale. The comparison includes all measured pixels in this interval.
+   VUV camera spectrum of shot 57-16. The curves retain their original wavelengths.
+   The neutral-carbon maxima are at 156.100 and 165.724 nm in the calculation
+   and 156.551 and 166.135 nm on the detector.
 
-Brandis, Johnston and Cruden report 0.04 mol% CO₂ in the Test 57 fill. A
-separate uniform equilibrium carbon slab at this abundance predicts carbon
-contributions of 0.233 and 0.534 W cm\ :sup:`−2` sr\ :sup:`−1` inside
-155.83–157.12 and 165.45–166.82 nm. The measured excesses above the air
-calculation are 0.247 and 0.244 in the same units. The uniform slab accounts
-for 94% of the first excess and 219% of the second. See the :download:`carbon
-calculation <../../../verification/eastSweep/results/carbon_check.csv>`,
-the `EAST fill composition <https://ntrs.nasa.gov/citations/20160009760>`_
-and the `NIST neutral-carbon wavelengths <https://pml.nist.gov/PhysRefData/Handbook/Tables/carbontable3.htm>`_.
+The reported fill recovers 95% of the area of the first feature and 205% of
+the second. At 157.92 nm, EAST measures 113 W cm⁻² sr⁻¹ µm⁻¹. The CO₂-free
+and reported-fill calculations give 29 and 37 in the same units. Switching
+off the four carbon molecular radiators at fixed composition changes the latter
+by 0.01. The carrier of this weaker maximum remains unassigned. The separate
+carbon-slab diagnostic is archived in the :download:`earlier comparison
+<../../../verification/eastSweep/results/carbon_check.csv>`.
+
+CO₂, CO₂⁺, C₂⁺ and CN⁺ enter the chemistry. Their high-temperature electronic
+opacities are unresolved. For the uniform equilibrium state of 57-16, an
+electronic oscillator-strength bound places the combined emitted radiance of
+CO₂, CO₂⁺ and C₂⁺ below 0.0000021 W cm⁻² sr⁻¹ over the VUV detector.
+The corresponding upper bound for CN⁺ is 0.0093 W cm⁻² sr⁻¹.
+
+For 50-29, adding 400 ppm CO₂ raises the 162–218 nm VUV integral from
+3.278 to 4.147 W cm⁻² sr⁻¹, compared with 4.814 measured. Over 339–471 nm
+the Blue camera changes from 1.666 to 1.669 W cm⁻² sr⁻¹, compared with 2.445 measured.
+
+The archived comparisons comprise 16 benchmark integrals and 85 integrals at
+the recorded shot conditions. Four resolved spectra are available for 50-29
+and 57-16. Downloads include the :download:`shock states
+<../../../verification/eastCarbon/results/states.csv>`,
+:download:`benchmark integrals <../../../verification/eastCarbon/results/benchmark.csv>`,
+:download:`recorded-condition integrals <../../../verification/eastCarbon/results/campaign.csv>`,
+:download:`camera spectra <../../../verification/eastCarbon/results/spectra.csv.gz>`,
+:download:`intervals <../../../verification/eastCarbon/results/intervals.csv>`,
+:download:`peak wavelengths and radiances <../../../verification/eastCarbon/results/peaks.csv>` and
+:download:`LTE emission bounds <../../../verification/eastCarbon/results/lte_emission_bounds.csv>`.
+The `EAST fill description <https://ntrs.nasa.gov/citations/20160009760>`_,
+`NASA CEA <https://github.com/nasa/cea>`_,
+`NIST atomic spectra <https://doi.org/10.18434/T4W30F>`_ and
+`molecular band tables <https://doi.org/10.1016/j.jqsrt.2008.09.007>`_
+give the source measurements and model data.
 
 Extended Tests 50 and 57
 ------------------------
