@@ -74,7 +74,8 @@ air calculation omits carbon. At the two measured peak pixels, EAST gives
 399.5 and 410.1 versus 30.0 and 26.9 W cm\ :sup:`−2` sr\ :sup:`−1`
 µm\ :sup:`−1` calculated. The neighbouring nitrogen peak is present in both
 spectra at 149.70 nm measured and 149.37 nm calculated. A weaker measured
-feature at 157.92 nm remains unassigned.
+feature at 157.92 nm reaches 113 in EAST and 29 in the calculated spectrum
+in the same units. Its carrier remains unassigned.
 
 .. figure:: ../../../verification/eastSweep/results/east_spectrum_57-16_VUV_detail.png
    :width: 58%
