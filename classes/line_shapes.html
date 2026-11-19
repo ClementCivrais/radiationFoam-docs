@@ -456,7 +456,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#one-case">One case</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#how-to-run">How to run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#output">Output</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#comparison-with-east">Comparison with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#earlier-equilibrium-comparisons">Earlier equilibrium comparisons</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#expected-result">Expected result</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east_equilibrium.html#references">References</a></li>
 </ul>
@@ -473,6 +473,14 @@
 <li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#output">Output</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#comparison-with-east">Comparison with EAST</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../examples/east5029.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/east_validation.html">EAST radiance validation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#equilibrium-columns">Equilibrium columns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#extended-tests-50-and-57">Extended Tests 50 and 57</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#dsmc-production-comparison-for-shot-50-29">DSMC production comparison for shot 50-29</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#verification">Verification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/east_validation.html#sources">Sources</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/instrument_tests.html">Instrument model verification</a><ul>
@@ -594,15 +602,12 @@ stops with the list of valid ones.</p>
 <li><p><strong>Width:</strong> Liu et al. (2001) Voigt width from <span class="math notranslate nohighlight">\(w_L\)</span> and
 <span class="math notranslate nohighlight">\(w_D\)</span>. The name keeps Olivero and Longbothum (1977), whose width
 formula this one replaces (the two agree within 3e-4).</p></li>
-<li><p><strong>Shape:</strong> Whiting (1968), with the wing correction evaluated as one
-exponential (see the note in <a class="reference internal" href="../theory/line_shapes.html"><span class="doc">Line shapes and broadening</span></a>).</p></li>
-<li><p><strong>Discretisation:</strong> cumulative table of 2001 points over
-<span class="math notranslate nohighlight">\(\pm 25\,w_V\)</span> (rectangle rule, normalised to unit area),
-linear interpolation with step <span class="math notranslate nohighlight">\(25\,w_V/1001\)</span>; bin
-<span class="math notranslate nohighlight">\((\lambda_{i-1}, \lambda_i]\)</span> per point; footprint on the
-unbounded lattice clipped to the grid.</p></li>
-<li><p><strong>Dictionary entries:</strong> none besides the selector. The table is
-rebuilt at every call (once per line and cell).</p></li>
+<li><p><strong>Shape:</strong> Whiting (1968), with separate exponential and rational wing terms.</p></li>
+<li><p><strong>Discretisation:</strong> bin integrals over <span class="math notranslate nohighlight">\((\lambda_{i-1},\lambda_i]\)</span>.
+The core uses trapezoidal integrals on a fixed dimensionless grid and the
+wings use tail integrals. The profile is normalised over its chosen extent.</p></li>
+<li><p><strong>Dictionary entry:</strong> <code class="docutils literal notranslate"><span class="pre">lineWingExtent</span></code> in Voigt widths, default 1000.
+Use <code class="docutils literal notranslate"><span class="pre">none</span></code> for the full line.</p></li>
 </ul>
 <section id="where-it-is-used">
 <h3>Where it is used<a class="headerlink" href="#where-it-is-used" title="Link to this heading"></a></h3>
@@ -625,12 +630,9 @@ sub-dictionary and calls <code class="docutils literal notranslate"><span class=
 </div>
 <p>The widths passed to it are computed by <code class="docutils literal notranslate"><span class="pre">atomicLines</span></code> (Stark, van der
 Waals, natural, phase and resonance for <span class="math notranslate nohighlight">\(w_L\)</span>, Doppler for
-<span class="math notranslate nohighlight">\(w_D\)</span>). Before the call, a line is skipped if its upper level is
-above the bound limit or if
-<span class="math notranslate nohighlight">\(\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)\)</span> misses the
-grid.</p>
-<p><code class="docutils literal notranslate"><span class="pre">diatomicBands</span></code> does <strong>not</strong> select a line shape: it evaluates the
-same Whiting shape, table and placement inline (<code class="docutils literal notranslate"><span class="pre">diatomicBands.C</span></code>),
+<span class="math notranslate nohighlight">\(w_D\)</span>). Lines above the bound limit are skipped, as are lines whose footprint
+misses the window.</p>
+<p><code class="docutils literal notranslate"><span class="pre">diatomicBands</span></code> uses the same Whiting profile and bin integration,
 with its own widths and the Voigt width
 <span class="math notranslate nohighlight">\(w_L/2 + \sqrt{w_L^2/4 + w_G^2}\)</span>, one table per vibrational
 transition. Its dictionary has no <code class="docutils literal notranslate"><span class="pre">lineShape</span></code> entry

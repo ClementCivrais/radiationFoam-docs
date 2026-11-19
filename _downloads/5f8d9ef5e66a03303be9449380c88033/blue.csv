@@ -1,0 +1,6 @@
+# band integrals [W cm^-2 sr^-1] of the measured spectra against the EAST cube means; compare_blue.py baseline corrected
+shot,band,east,baseline,ratio_baseline,corrected,ratio_corrected
+50-29,339-471 nm,2.4455,1.6278,0.6656,1.6278,0.6656
+50-29,330-500 nm,2.9609,1.9226,0.6493,1.9226,0.6493
+57-16,190-350 nm,3.6333,1.5496,0.4265,1.5496,0.4265
+57-16,230-330 nm,2.0214,0.99047,0.4900,0.99047,0.4900

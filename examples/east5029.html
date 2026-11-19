@@ -23,7 +23,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Instrument model verification" href="instrument_tests.html" />
+    <link rel="next" title="EAST radiance validation" href="east_validation.html" />
     <link rel="prev" title="EAST equilibrium columns" href="east_equilibrium.html" /> 
 </head>
 
@@ -456,7 +456,7 @@
 <li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#one-case">One case</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#how-to-run">How to run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#output">Output</a></li>
-<li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#comparison-with-east">Comparison with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#earlier-equilibrium-comparisons">Earlier equilibrium comparisons</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#expected-result">Expected result</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east_equilibrium.html#references">References</a></li>
 </ul>
@@ -473,6 +473,14 @@
 <li class="toctree-l3"><a class="reference internal" href="#output">Output</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#comparison-with-east">Comparison with EAST</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="east_validation.html">EAST radiance validation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#equilibrium-columns">Equilibrium columns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#extended-tests-50-and-57">Extended Tests 50 and 57</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#dsmc-production-comparison-for-shot-50-29">DSMC production comparison for shot 50-29</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#verification">Verification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#sources">Sources</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="instrument_tests.html">Instrument model verification</a><ul>
@@ -545,6 +553,7 @@
              
   <section id="east-shot-50-29-on-a-dsmcfoam-run">
 <h1>EAST shot 50-29 on a dsmcFoam run<a class="headerlink" href="#east-shot-50-29-on-a-dsmcfoam-run" title="Link to this heading"></a></h1>
+<p>See <a class="reference internal" href="east_validation.html"><span class="doc">EAST radiance validation</span></a> for the November 2026 comparison with EAST.</p>
 <p>Directory: <code class="docutils literal notranslate"><span class="pre">tutorials/EAST/east5029/</span></code> (<code class="docutils literal notranslate"><span class="pre">README.md</span></code>, <code class="docutils literal notranslate"><span class="pre">Allrun</span></code>,
 <code class="docutils literal notranslate"><span class="pre">Allclean</span></code>, <code class="docutils literal notranslate"><span class="pre">system/controlDict</span></code>, <code class="docutils literal notranslate"><span class="pre">system/radiationProperties</span></code>).</p>
 <section id="purpose">
@@ -558,9 +567,9 @@ level populations sampled by dsmcFoam in every cell, and reproduces the two
 benchmark cameras of the shot, VUV and UV/Vis, with their line shapes,
 spatial resolution, shock-front definition, nonequilibrium metric and
 spectra.</p>
-<p>The deck does not run on its own: it needs the output of dsmcFoam. No result
-of it is shown here, because no complete dsmcFoam run of the shot is
-distributed with the tutorial.</p>
+<p>The deck reads the fields and distribution blocks from a completed dsmcFoam
+run. The ten-block production comparison, including both camera profiles and
+the downloadable radiance tables, is in <a class="reference internal" href="east_validation.html"><span class="doc">EAST radiance validation</span></a>.</p>
 </section>
 <section id="physics-shown">
 <h2>Physics shown<a class="headerlink" href="#physics-shown" title="Link to this heading"></a></h2>
@@ -840,7 +849,7 @@ Technology, Gaithersburg, MD, 2024. doi:10.18434/T4W30F</p></li>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="east_equilibrium.html" class="btn btn-neutral float-left" title="EAST equilibrium columns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="instrument_tests.html" class="btn btn-neutral float-right" title="Instrument model verification" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="east_validation.html" class="btn btn-neutral float-right" title="EAST radiance validation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

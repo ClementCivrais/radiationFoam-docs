@@ -256,6 +256,12 @@ content of the camera (``docs/reports/EAST_VUV_FLOOR_FIX_20261117.md``; the
 former range study ``docs/reports/EAST_ILS_CUTOFF_20261117.md``). ILS2 is
 truncated at :math:`R` and renormalised with its analytic CDF.
 
+For a square-root Voigt with zero Lorentz width, the finite-range
+density is proportional to :math:`\exp[-\ln(2)s^2/(2w_G^2)]`.
+With zero Gaussian width its integrated mass is proportional to
+:math:`\operatorname{asinh}(s/w_L)`. The implementation evaluates
+these limits analytically on the chosen support.
+
 .. figure:: /_static/figures/theory/instrument_ils.png
    :width: 60%
    :align: center

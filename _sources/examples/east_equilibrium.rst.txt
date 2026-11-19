@@ -1,6 +1,8 @@
 EAST equilibrium columns
 ========================
 
+See :doc:`east_validation` for the November 2026 comparison with EAST.
+
 Directory: ``tutorials/EAST/equilibrium/``.
 
 Purpose
@@ -54,9 +56,9 @@ tables inside the script
    ``ATOMS``, ``MOLS``: species data (mass, radius, database file, ionisation
    energy, Stark exponent 0.33); ``BAND``: the benchmark window and grid
    spacing of each camera (Brandis and Cruden 2017, Figs. 6(a)-14(a));
-   ``ILS``: the shots of each camera and their line shape (form, :math:`w_G`,
-   :math:`w_L`, :math:`\log_{10} a`); ``CUT``: the ILS cut-off, 10 nm for
-   the sqrt-Voigt and 20 nm for the Gauss + Lorentz form (not published);
+   ``ILS``: the benchmark shots of each camera and their line shape (form, :math:`w_G`,
+   :math:`w_L`, :math:`\log_{10} a`); ``CUT``: the historical cutoff values. The current facility dictionaries specify
+   the detector coverage and line shape;
    ``SPECTRA``: four spectrum cases of shots 50-29 and 57-16 on the full
    camera ranges.
 
@@ -107,7 +109,7 @@ continuum), ``meinel`` (``stark`` plus the full ``N2plus.dat``), ``full``
   ``writeSpectra (1)`` and ``writeCoefficients true``;
 * ``bench_<shot>_<camera>`` (26): one per shot and benchmark camera;
 * ``diag_50-29_<camera>_<group>`` (20): the 50-29 state in every benchmark
-  window with all species, then neutral atoms, ions and molecules alone (the
+  window, using its own camera where available and a representative camera elsewhere, with all species, then neutral atoms, ions and molecules alone (the
   group cases run without the continuum, which needs every atom with its
   ion).
 
@@ -202,10 +204,11 @@ Per case, in ``postProcessing/radiationFoam/`` (:doc:`/guide/post_processing`):
 * ``spec_*`` and the ``all`` diagnostics also write ``spectra_W.bin``,
   ``emission_W.bin``, ``absorption_W.bin`` and ``.info`` for cell 1.
 
-Comparison with EAST
---------------------
+Earlier equilibrium comparisons
+-------------------------------
 
-The comparison scripts are not part of the tutorial; they are kept with the
+The figures in this section document the earlier benchmark passes. The latest
+comparison is reported in :doc:`east_validation`. The earlier scripts are kept with the
 EAST data in the DSMC_Rovibronic repository
 (``run/RAD/EAST/equilibrium/compare_pass2.py``, digitised benchmark values
 and calibrated EAST data cubes in ``run/RAD/EAST/``). They read

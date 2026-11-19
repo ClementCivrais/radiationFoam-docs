@@ -206,7 +206,7 @@ Instrument
      - After the removal of the two slit tests with the replica instrument
        function: 45 of 45 checks, 21 outputs identical (gate G3).
    * - ``0c92404``
-     - The suite as the tutorial ``tutorials/instrumentTests`` (45 checks).
+     - The tutorial ``tutorials/instrumentTests`` now includes 53 checks (45 in the original gate).
 
 Restructure and review gates
 ----------------------------

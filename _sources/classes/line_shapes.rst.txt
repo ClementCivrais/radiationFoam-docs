@@ -58,15 +58,12 @@ The only line shape (``derived/voigtWhitingOliveroLongbothum``).
 * **Width:** Liu et al. (2001) Voigt width from :math:`w_L` and
   :math:`w_D`. The name keeps Olivero and Longbothum (1977), whose width
   formula this one replaces (the two agree within 3e-4).
-* **Shape:** Whiting (1968), with the wing correction evaluated as one
-  exponential (see the note in :doc:`/theory/line_shapes`).
-* **Discretisation:** cumulative table of 2001 points over
-  :math:`\pm 25\,w_V` (rectangle rule, normalised to unit area),
-  linear interpolation with step :math:`25\,w_V/1001`; bin
-  :math:`(\lambda_{i-1}, \lambda_i]` per point; footprint on the
-  unbounded lattice clipped to the grid.
-* **Dictionary entries:** none besides the selector. The table is
-  rebuilt at every call (once per line and cell).
+* **Shape:** Whiting (1968), with separate exponential and rational wing terms.
+* **Discretisation:** bin integrals over :math:`(\lambda_{i-1},\lambda_i]`.
+  The core uses trapezoidal integrals on a fixed dimensionless grid and the
+  wings use tail integrals. The profile is normalised over its chosen extent.
+* **Dictionary entry:** ``lineWingExtent`` in Voigt widths, default 1000.
+  Use ``none`` for the full line.
 
 Where it is used
 ~~~~~~~~~~~~~~~~
@@ -92,13 +89,10 @@ sub-dictionary and calls ``lineProfile`` once per line and cell:
 
 The widths passed to it are computed by ``atomicLines`` (Stark, van der
 Waals, natural, phase and resonance for :math:`w_L`, Doppler for
-:math:`w_D`). Before the call, a line is skipped if its upper level is
-above the bound limit or if
-:math:`\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)` misses the
-grid.
+:math:`w_D`). Lines above the bound limit are skipped, as are lines whose footprint
+misses the window.
 
-``diatomicBands`` does **not** select a line shape: it evaluates the
-same Whiting shape, table and placement inline (``diatomicBands.C``),
+``diatomicBands`` uses the same Whiting profile and bin integration,
 with its own widths and the Voigt width
 :math:`w_L/2 + \sqrt{w_L^2/4 + w_G^2}`, one table per vibrational
 transition. Its dictionary has no ``lineShape`` entry

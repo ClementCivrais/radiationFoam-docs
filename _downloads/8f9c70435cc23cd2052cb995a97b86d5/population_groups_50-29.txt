@@ -1,0 +1,12 @@
+# group, camera band, share of the species' thin emission in the band at 10000 K, levels
+N 174.3 nm upper (86137 cm-1), VUV, 1.000, 9 10
+N 411.1 nm upper (110521 cm-1), UVVis, 0.356, 104 105
+N 383.2 nm upper (112294 cm-1), UVVis, 0.247, 121 122
+O 164.1 nm upper (76795 cm-1), VUV, 1.000, 7
+O 394.8 nm upper (99093 cm-1), UVVis, 0.362, 24 25 26
+O 436.9 nm upper (99681 cm-1), UVVis, 0.279, 27 28 29
+N2 B3Pi, -, -, every (v, J) of state B3Pi
+N2 C3Pi, -, -, every (v, J) of state C3Pi
+N2+ B2Sigma, -, -, every (v, J) of state B2Sigma
+NO A2Sigma, -, -, every (v, J) of state A2Sigma
+NO B2Pi, -, -, every (v, J) of state B2Pi

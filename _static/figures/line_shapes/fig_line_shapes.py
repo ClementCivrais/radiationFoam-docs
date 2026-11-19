@@ -43,14 +43,14 @@ def width_ol(wL, wD):
 
 
 def whiting(x, wL, wV):
-    """Whiting (1968) shape as coded (wing term inside one exponential), x = |dlambda|/wV, [1/m] times wV"""
+    """Whiting (1968) profile with the published wing correction, x = |dlambda|/wV, [1/m] times wV"""
     a = wL / wV
     c0 = 1.0 / ((1.065 + (0.447 + 0.058 * a) * a) * wV)
     c2 = a * c0
     c1 = c0 - c2
     x225 = x**2.25
     return (c1 * np.exp(-2.772 * x**2) + c2 / (1.0 + 4.0 * x**2)
-            + 0.016 * c2 * (1.0 - a) * np.exp(-0.4 * x225 - 10.0 / (10.0 + x225)))
+            + 0.016 * c2 * (1.0 - a) * (np.exp(-0.4 * x225) - 10.0 / (10.0 + x225)))
 
 
 def voigt(dl, wL, wD):

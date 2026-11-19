@@ -1,0 +1,8 @@
+# measured band radiance [W cm^-2 sr^-1]: metric = (1/D) int over x0 +/- 2 cm (D = 10.16 cm; overlap of every profile), eq = mean over 3-4.5 cm, mean_0_5 = mean over shared 0-5 cm coverage; dist = cellDistribution, boltz = boltzmannTemperatures, east = EAST cube
+camera,band,range_nm,metric_min_cm,metric_max_cm,mean_min_cm,mean_max_cm,dist_metric,dist_eq,dist_mean_0_5,boltz_metric,boltz_eq,boltz_mean_0_5,east_metric,east_eq,east_mean_0_5
+VUV,VUV_EAST,162-218,-0.57601,2,0,4.9182,0.88717,3.6631,3.568,2.6406,4.4317,6.0307,1.0476,4.1932,4.5654
+VUV,VUV_eq,170-180,-0.57601,2,0,4.9182,0.7193,3.0684,2.9638,1.3084,3.3266,3.9131,0.61239,2.9292,2.9422
+VUV,VUV_neq,170-178,-0.57601,2,0,4.9182,0.70495,3.0118,2.908,1.2207,3.2379,3.7602,0.60183,2.9048,2.9097
+UVVis,UVVis_EAST,328-477,-0.57601,2,0,4.9182,0.66183,1.7337,1.9557,0.92419,2.0839,2.5243,0.63867,2.3382,2.7078
+UVVis,UVVis_eq,339-471,-0.57601,2,0,4.9182,0.59008,1.5709,1.766,0.8326,1.9037,2.2981,0.56259,2.1024,2.4144
+UVVis,UVVis_neq,328-496,-0.57601,2,0,4.9182,0.69576,1.8784,2.0973,0.97067,2.2395,2.6911,0.67688,2.5277,2.903

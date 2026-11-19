@@ -1,0 +1,9 @@
+VUV 170-178, all shots >= 10 km/s (26 shots): slope b = +0.310 +/- 0.076 per km/s (d ln ratio / dU), scatter 0.203; epoch means T50a (Dec 2009 - Mar 2010) 1.066, T50b (Jul 2010) 1.489, T57a (Feb - Mar 2015) 1.190, T57b (Apr 2015) 1.074
+VUV 170-178, without flagged (23 shots): slope b = +0.098 +/- 0.053 per km/s (d ln ratio / dU), scatter 0.102; epoch means T50a (Dec 2009 - Mar 2010) 0.921, T50b (Jul 2010) 1.368, T57a (Feb - Mar 2015) 1.117, T57b (Apr 2015) 1.428
+VUV 122-153, all shots >= 10 km/s (11 shots): slope b = +0.288 +/- 0.081 per km/s (d ln ratio / dU), scatter 0.185; epoch means T57a (Feb - Mar 2015) 0.804, T57b (Apr 2015) 0.755
+VUV 122-153, without flagged (9 shots): slope b = +0.036 +/- 0.045 per km/s (d ln ratio / dU), scatter 0.065; epoch means T57a (Feb - Mar 2015) 0.725, T57b (Apr 2015) 0.972
+DeepVUV 117-153, all shots >= 10 km/s (9 shots): slope b = +0.103 +/- 0.043 per km/s (d ln ratio / dU), scatter 0.079; epoch means T57a (Feb - Mar 2015) 0.798, T57b (Apr 2015) 0.959
+DeepVUV 117-153, without flagged (9 shots): slope b = +0.103 +/- 0.043 per km/s (d ln ratio / dU), scatter 0.079; epoch means T57a (Feb - Mar 2015) 0.798, T57b (Apr 2015) 0.959
+IR 1121-1450, all shots >= 10 km/s (20 shots): slope b = +0.232 +/- 0.068 per km/s (d ln ratio / dU), scatter 0.202; epoch means T57a (Feb - Mar 2015) 0.996, T57b (Apr 2015) 0.781
+IR 1121-1450, without flagged (18 shots): slope b = +0.148 +/- 0.070 per km/s (d ln ratio / dU), scatter 0.169; epoch means T57a (Feb - Mar 2015) 0.951, T57b (Apr 2015) 0.817
+benchmark shots (7, VUV 170-180 nm, no epoch term): slope b = +0.184 per km/s, ratio at 11 km/s 1.153

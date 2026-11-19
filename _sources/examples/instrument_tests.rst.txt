@@ -11,7 +11,7 @@ This tutorial verifies the instrument (measurement) model of
 :doc:`/theory/instrument` without the solver. ``run_tests.py`` writes input
 signals, drives the classes of ``src/radiation/instrument`` through the test
 application ``Test-radiationInstrument``, and compares every output with an
-analytical result or an independent Python transcription: 45 checks of the
+analytical result or an independent Python transcription: 53 checks of the
 kernels, the discrete convolution, the edge conservation, the band integral,
 the shock-front criteria and the complete measurement of a field. It is the
 gate to pass after any change of the instrument code, and an example of how
@@ -94,9 +94,9 @@ The tests
        SRF, bands ``line`` and ``full``, ``peakRadiance`` front
      - analytical measured field, band profiles and front
 
-The 45 checks are: the integral conservation of each T1-T4 convolution with
-``conserveAtEdges true`` (15, tolerance :math:`10^{-12}`), the agreement
-with the reference of each T1, T2 and T3 case (14), the edge loss of T4
+The 53 checks are: the integral conservation of each T1-T4 convolution with
+``conserveAtEdges true`` (19, tolerance :math:`10^{-12}`), the agreement
+with the reference of each T1, T2 and T3 case (18), the edge loss of T4
 false (1), two per T6 band (8), three front locations of T7 (3), and the
 field, the two band profiles and the front of T8 (4).
 
@@ -125,7 +125,8 @@ Output
 Expected result
 ---------------
 
-All 45 checks pass. Values from a run of the same tests in the
+The 53 checks include four truncated or pure-component response cases.
+The table below gives the original suite values from the
 DSMC_Rovibronic repository (``run/RAD/instrument_tests/summary.csv``,
 2026-11-14; that file also holds two checks of a kernel removed since, not
 listed here):

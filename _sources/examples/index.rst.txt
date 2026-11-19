@@ -40,7 +40,7 @@ so the log is ``log.radiationFoam``. Every output is written to
        spectra
      - hours for every cell (a quick look with ``STRIDE``); needs a dsmcFoam run
    * - :doc:`instrument_tests`
-     - Verification of the instrument model: 45 checks of every kernel, the
+     - Verification of the instrument model: 53 checks of every kernel, the
        convolution, the band integral, the front criteria and the full
        measurement against analytical results
      - short (Python reference quadratures dominate)
@@ -55,4 +55,5 @@ The runtimes are indications from the logs of runs of the same or larger decks o
    shockTube1D
    east_equilibrium
    east5029
+   east_validation
    instrument_tests

@@ -1,6 +1,8 @@
 EAST shot 50-29 on a dsmcFoam run
 =================================
 
+See :doc:`east_validation` for the November 2026 comparison with EAST.
+
 Directory: ``tutorials/EAST/east5029/`` (``README.md``, ``Allrun``,
 ``Allclean``, ``system/controlDict``, ``system/radiationProperties``).
 
@@ -17,9 +19,9 @@ benchmark cameras of the shot, VUV and UV/Vis, with their line shapes,
 spatial resolution, shock-front definition, nonequilibrium metric and
 spectra.
 
-The deck does not run on its own: it needs the output of dsmcFoam. No result
-of it is shown here, because no complete dsmcFoam run of the shot is
-distributed with the tutorial.
+The deck reads the fields and distribution blocks from a completed dsmcFoam
+run. The ten-block production comparison, including both camera profiles and
+the downloadable radiance tables, is in :doc:`east_validation`.
 
 Physics shown
 -------------

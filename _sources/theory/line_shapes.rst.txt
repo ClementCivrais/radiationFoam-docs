@@ -304,9 +304,9 @@ with :math:`p = \sum_j n_j k T_j + n_e k T_e`,
 :math:`n_f = \max(p/(kT) - n,\ 10^{-40} p/(kT))` the foreign-gas density
 (:math:`10^{10}` if :math:`p \le 10^{-16}`), and :math:`M_f` the
 foreign-gas molar mass. The cgs/Angstrom factors are carried verbatim.
-As documented in the class header (item 11), :math:`M_f` is compared
-with its bounds in the wrong units, so it ends at 28.85 for any mixture
-and at 10 for a pure radiator. The Lorentz width is the sum of the four
+The foreign mass :math:`(\rho-mn)/(n_f\,\mathrm{amu})` is bounded
+between 10 and 28.85 in atomic mass units. The low-density fallback is
+20 for :math:`\rho\leq10^{-16}\,\mathrm{kg\,m^{-3}}`. The Lorentz width is the sum of the four
 collision and radiative terms, and the Voigt width uses the simpler form
 
 .. math::
@@ -367,7 +367,7 @@ the shape of Whiting (1968) is
    \phi(x) = c_1\,e^{-2.772\,x^{2}}
            + \frac{c_2}{1 + 4x^{2}}
            + 0.016\,c_2\,(1 - a)\,
-             \exp\!\left(-0.4\,x^{2.25} - \frac{10}{10 + x^{2.25}}\right),
+             \left[\exp(-0.4\,x^{2.25}) - \frac{10}{10 + x^{2.25}}\right],
 
 .. math::
 
@@ -380,14 +380,6 @@ The first term is a Gaussian of FWHM :math:`w_V`
 :math:`w_V`, mixed in the proportion :math:`a`; :math:`c_0` is the peak
 value that gives unit area. The third term is a small correction of the
 wings.
-
-.. note::
-
-   Whiting's printed form of the correction is
-   :math:`\exp(-0.4x^{2.25}) - 10/(10 + x^{2.25})`; the code evaluates
-   :math:`\exp(-0.4x^{2.25} - 10/(10 + x^{2.25}))`, the form of the
-   verified version (``docs/RADIATION_SPEC.md`` 9.3.2). It acts only on
-   the term of amplitude :math:`0.016\,c_2(1 - a)`.
 
 .. figure:: /_static/figures/line_shapes/line_shapes_voigt.png
    :width: 100%
@@ -402,35 +394,19 @@ wings.
 Truncation and cumulative table
 -------------------------------
 
-The profile is not evaluated at every grid point. For each line (atoms)
-or vibrational transition (molecules) the code builds the **cumulative
-profile**
+For atoms and molecules, the code tabulates the integral from the line
+centre to :math:`25w_V` for each of the three terms in the Whiting
+profile. The trapezoidal rule and linear interpolation use the same
+spacing, :math:`25w_V/1000`. Reflection gives the other half of the line.
+Beyond the table the code integrates the Lorentz wing analytically and
+uses a convergent expansion for the rational correction. Taking the
+difference of the tail integrals directly preserves weak far-wing bins.
 
-.. math::
-
-   C(\Delta\lambda) = \int_{-25 w_V}^{\Delta\lambda} \phi\,
-     \mathrm{d}\Delta\lambda'
-
-on 2001 points over :math:`|\Delta\lambda| \le 25\,w_V`:
-
-* the left half is a rectangle-rule sum from the far left wing, with the
-  step :math:`25\,w_V/1000`; the right half is the mirror image
-  :math:`C(+x) = 2C(0) - C(-x)`;
-* the table is divided by its value at :math:`+25\,w_V`, so the
-  truncated profile has unit area: the line wings beyond
-  :math:`\pm 25\,w_V` are cut and their share is redistributed over the
-  kept part. For a pure Lorentzian the share beyond
-  :math:`\pm 25\,w_V` is :math:`1 - (2/\pi)\arctan 50 = 1.3\,\%`; for a
-  Gaussian it is negligible;
-* the table is read by linear interpolation with the step
-  :math:`25\,w_V/1001`, not the :math:`25\,w_V/1000` it was built with
-  (verified-version form, ``docs/RADIATION_SPEC.md`` 9.4.1): the
-  profile used is the built one narrowed by the factor 1000/1001;
-* outside the table :math:`C = 0` (left) and :math:`C = 1` (right).
-
-A coarser pre-selection skips an atomic line entirely when the interval
-:math:`\lambda_0 \pm (100\max(w_L, w_D) + \Delta\lambda)` does not
-overlap the grid.
+Each profile is normalised over the chosen half-extent :math:`D` before
+intersection with the spectral window. Atomic lines use ``lineWingExtent``
+(default 1000 Voigt widths, or ``none`` for unbounded wings). Molecular
+lines use :math:`D=25w_V`. For a pure Lorentzian, the fraction beyond
+25 widths is :math:`1-(2/\pi)\arctan(50)\simeq 0.013`.
 
 Placement on the spectral grid
 ------------------------------
@@ -449,14 +425,14 @@ first point, and receives the mean of the profile over its bin:
 
 The **footprint** of the line on the unbounded lattice
 :math:`\lambda_\mathrm{min} + i\,\Delta\lambda` runs from the point
-:math:`\lfloor(\lambda_0 - 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor`
+:math:`\lfloor(\lambda_0 - D - \lambda_\mathrm{min})/\Delta\lambda\rfloor`
 to the point
-:math:`\lfloor(\lambda_0 + 25w_V - \lambda_\mathrm{min})/\Delta\lambda\rfloor + 1`,
+:math:`\lfloor(\lambda_0 + D - \lambda_\mathrm{min})/\Delta\lambda\rfloor + 1`,
 whose bin holds the right end of the footprint, and is intersected with
 the grid. The consequences are:
 
 * **Conservation on any grid.** The bin values telescope:
-  :math:`\sum_i \phi_i\,\Delta\lambda = C(+25w_V) - C(-25w_V) = 1` for a
+  :math:`\sum_i \phi_i\,\Delta\lambda = C(+D) - C(-D) = 1` for a
   line inside the window, whatever the ratio of the line width to
   :math:`\Delta\lambda`. A line narrower than one bin is placed in the
   bin that contains it, with its whole area; it is not lost between two

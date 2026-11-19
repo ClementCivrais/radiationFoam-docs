@@ -39,10 +39,10 @@ matplotlib:
 .. code-block:: bash
 
    cd tutorials/instrumentTests
-   ./Allrun        # prints: checks: 45 pass, 0 fail (summary.csv)
+   ./Allrun        # prints: 53 checks, 0 failed (summary.csv)
    ./Allclean      # removes cases, output, figures, system, summary.csv, logs
 
-What the 45 checks cover (names as in ``summary.csv``):
+What the 53 checks cover (names as in ``summary.csv``):
 
 .. list-table::
    :header-rows: 1

@@ -456,7 +456,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#one-case">One case</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#how-to-run">How to run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#output">Output</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#comparison-with-east">Comparison with EAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#earlier-equilibrium-comparisons">Earlier equilibrium comparisons</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#expected-result">Expected result</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
 </ul>
@@ -473,6 +473,14 @@
 <li class="toctree-l3"><a class="reference internal" href="east5029.html#output">Output</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east5029.html#comparison-with-east">Comparison with EAST</a></li>
 <li class="toctree-l3"><a class="reference internal" href="east5029.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="east_validation.html">EAST radiance validation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#equilibrium-columns">Equilibrium columns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#extended-tests-50-and-57">Extended Tests 50 and 57</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#dsmc-production-comparison-for-shot-50-29">DSMC production comparison for shot 50-29</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#verification">Verification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="east_validation.html#sources">Sources</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="instrument_tests.html">Instrument model verification</a><ul>
@@ -545,6 +553,7 @@
              
   <section id="east-equilibrium-columns">
 <h1>EAST equilibrium columns<a class="headerlink" href="#east-equilibrium-columns" title="Link to this heading"></a></h1>
+<p>See <a class="reference internal" href="east_validation.html"><span class="doc">EAST radiance validation</span></a> for the November 2026 comparison with EAST.</p>
 <p>Directory: <code class="docutils literal notranslate"><span class="pre">tutorials/EAST/equilibrium/</span></code>.</p>
 <section id="purpose">
 <h2>Purpose<a class="headerlink" href="#purpose" title="Link to this heading"></a></h2>
@@ -594,9 +603,9 @@ pressure, computed in the DSMC_Rovibronic repository
 <dt>tables inside the script</dt><dd><p><code class="docutils literal notranslate"><span class="pre">ATOMS</span></code>, <code class="docutils literal notranslate"><span class="pre">MOLS</span></code>: species data (mass, radius, database file, ionisation
 energy, Stark exponent 0.33); <code class="docutils literal notranslate"><span class="pre">BAND</span></code>: the benchmark window and grid
 spacing of each camera (Brandis and Cruden 2017, Figs. 6(a)-14(a));
-<code class="docutils literal notranslate"><span class="pre">ILS</span></code>: the shots of each camera and their line shape (form, <span class="math notranslate nohighlight">\(w_G\)</span>,
-<span class="math notranslate nohighlight">\(w_L\)</span>, <span class="math notranslate nohighlight">\(\log_{10} a\)</span>); <code class="docutils literal notranslate"><span class="pre">CUT</span></code>: the ILS cut-off, 10 nm for
-the sqrt-Voigt and 20 nm for the Gauss + Lorentz form (not published);
+<code class="docutils literal notranslate"><span class="pre">ILS</span></code>: the benchmark shots of each camera and their line shape (form, <span class="math notranslate nohighlight">\(w_G\)</span>,
+<span class="math notranslate nohighlight">\(w_L\)</span>, <span class="math notranslate nohighlight">\(\log_{10} a\)</span>); <code class="docutils literal notranslate"><span class="pre">CUT</span></code>: the historical cutoff values. The current facility dictionaries specify
+the detector coverage and line shape;
 <code class="docutils literal notranslate"><span class="pre">SPECTRA</span></code>: four spectrum cases of shots 50-29 and 57-16 on the full
 camera ranges.</p>
 </dd>
@@ -660,7 +669,7 @@ continuum), <code class="docutils literal notranslate"><span class="pre">meinel<
 <code class="docutils literal notranslate"><span class="pre">writeSpectra</span> <span class="pre">(1)</span></code> and <code class="docutils literal notranslate"><span class="pre">writeCoefficients</span> <span class="pre">true</span></code>;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">bench_&lt;shot&gt;_&lt;camera&gt;</span></code> (26): one per shot and benchmark camera;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">diag_50-29_&lt;camera&gt;_&lt;group&gt;</span></code> (20): the 50-29 state in every benchmark
-window with all species, then neutral atoms, ions and molecules alone (the
+window, using its own camera where available and a representative camera elsewhere, with all species, then neutral atoms, ions and molecules alone (the
 group cases run without the continuum, which needs every atom with its
 ion).</p></li>
 </ul>
@@ -752,9 +761,10 @@ the equilibrium radiance of the shot;</p></li>
 <code class="docutils literal notranslate"><span class="pre">emission_W.bin</span></code>, <code class="docutils literal notranslate"><span class="pre">absorption_W.bin</span></code> and <code class="docutils literal notranslate"><span class="pre">.info</span></code> for cell 1.</p></li>
 </ul>
 </section>
-<section id="comparison-with-east">
-<h2>Comparison with EAST<a class="headerlink" href="#comparison-with-east" title="Link to this heading"></a></h2>
-<p>The comparison scripts are not part of the tutorial; they are kept with the
+<section id="earlier-equilibrium-comparisons">
+<h2>Earlier equilibrium comparisons<a class="headerlink" href="#earlier-equilibrium-comparisons" title="Link to this heading"></a></h2>
+<p>The figures in this section document the earlier benchmark passes. The latest
+comparison is reported in <a class="reference internal" href="east_validation.html"><span class="doc">EAST radiance validation</span></a>. The earlier scripts are kept with the
 EAST data in the DSMC_Rovibronic repository
 (<code class="docutils literal notranslate"><span class="pre">run/RAD/EAST/equilibrium/compare_pass2.py</span></code>, digitised benchmark values
 and calibrated EAST data cubes in <code class="docutils literal notranslate"><span class="pre">run/RAD/EAST/</span></code>). They read

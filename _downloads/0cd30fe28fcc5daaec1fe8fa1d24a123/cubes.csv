@@ -1,0 +1,7 @@
+# band integrals [W cm^-2 sr^-1] of the measured equilibrium spectra against the EAST cube means; compare_wings.py
+shot,window,east,baseline,ratio_baseline,corrected,ratio_corrected
+50-29,VUV 170-180 nm,3.17868,3.0966,0.974178,2.73485,0.860373
+50-29,VUV 162-218 nm,4.81359,3.69091,0.766769,3.28831,0.683132
+57-16,VUV 122-153 nm,13.6456,10.747,0.787578,9.82127,0.71974
+57-16,VUV 170-178 nm,2.93966,3.57208,1.21513,3.15926,1.0747
+57-16,VUV 122-178 nm,17.7499,14.8656,0.837504,13.4781,0.759336

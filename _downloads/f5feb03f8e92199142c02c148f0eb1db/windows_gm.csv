@@ -1,0 +1,7 @@
+# geometric mean of present/EAST per window (min-max over the shots); compare_wings.py
+window,shots,baseline,corrected,range_baseline,range_corrected
+DeepVUV 117-153 nm,4,0.7853,0.7357,0.724-0.834,0.679-0.778
+VUV 170-180 nm,7,1.2290,1.1008,0.918-1.518,0.804-1.410
+UVVis 339-471 nm,6,0.6853,0.6853,0.532-0.926,0.532-0.926
+VisNIR 730-890 nm,4,1.0642,1.0574,1.019-1.126,1.010-1.121
+IR 890-1185 nm,7,0.9650,0.9640,0.852-1.134,0.852-1.133
