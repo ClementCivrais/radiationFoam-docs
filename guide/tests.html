@@ -567,7 +567,7 @@ to check the instrument, line widths, atomic populations, band integration and
 two calibrated EAST camera decks. The shot 57-16 test also checks the measured
 carbon peak positions and the excess above the computed air spectrum. Run <code class="docutils literal notranslate"><span class="pre">run/RAD/regression/Allrun</span> <span class="pre">--full</span></code>
 for all 50 equilibrium decks, their archived checksums, input overrides and
-the radiationFoam regression suite. Both commands use the installed executables
+the radiationFoam regression suite. Its 26 required reference outputs are eachncompared byte for byte. A missing or differing file fails the command. Both commands use the installed executables
 and a sibling radiationFoam checkout, or the checkout named by
 <code class="docutils literal notranslate"><span class="pre">RADIATIONFOAM_DIR</span></code>. The runner prints its work directory.</p>
 </section>
